@@ -27,15 +27,17 @@ export default function Calendar({ me }) {
   const days = Array.from({ length: 7 }, (_, i) => { const d = new Date(start); d.setDate(d.getDate() + i); return d; });
   const today = todayStr();
   const show = (w) => who === 'all' || w === who || w === 'both';
-  const selected = sel && events.find((e) => e.id === sel);
+  const [ed, setEd] = useState(null);
+  const selected = sel && ed && ed.id === sel ? ed : null;
+  const pick = (e) => { setDraft(null); setSel(e.id); setEd(e); };
 
   const openNew = (date) => { setSel(null); setDraft({ title: '', date, time: '', who: me, notes: '' }); };
   const saveDraft = (e) => {
     e.preventDefault();
     if (!draft.title.trim()) return;
-    save('event', { ...draft, title: draft.title.trim() }).then((row) => { setDraft(null); setSel(row.id); });
+    save('event', { ...draft, title: draft.title.trim() }).then((row) => pick(row));
   };
-  const edit = (changes) => save('event', { ...selected, ...changes }, selected.id);
+  const edit = (changes) => { const next = { ...ed, ...changes }; setEd(next); save('event', next, next.id); };
 
   const form = (val, set, onSubmit, submitLabel) => (
     <form style={{ display: 'flex', flexDirection: 'column', gap: 10 }} onSubmit={onSubmit}>
@@ -92,7 +94,7 @@ export default function Calendar({ me }) {
                     <span className="display" style={{ fontSize: 18 }}>{d.getDate()}</span>
                   </button>
                   {evs.map((e) => (
-                    <button key={e.id} type="button" onClick={() => { setDraft(null); setSel(e.id); }} style={{ textAlign: 'left', padding: 8, borderRadius: 'var(--r)', border: 0, cursor: 'pointer', fontSize: 13, background: colorOf(e.who), color: 'var(--on-accent)', outline: sel === e.id ? '3px solid var(--text)' : 'none', outlineOffset: 2 }}>
+                    <button key={e.id} type="button" onClick={() => pick(e)} style={{ textAlign: 'left', padding: 8, borderRadius: 'var(--r)', border: 0, cursor: 'pointer', fontSize: 13, background: colorOf(e.who), color: 'var(--on-accent)', outline: sel === e.id ? '3px solid var(--text)' : 'none', outlineOffset: 2 }}>
                       {e.time && <span style={{ display: 'block', fontSize: 12, opacity: 0.85 }}>{e.time}</span>}
                       <b>{e.title}</b>
                     </button>

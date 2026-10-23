@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { remove, save } from '../db.js';
 import { useItems, other, todayStr } from '../store.js';
 import { PEOPLE } from '../config.js';
+import Live from './Live.jsx';
 import { DEFAULT_GOALS, MACROS, logMed, medLogId, seedMedsIfEmpty, totals } from '../health.js';
 
 const num = (v) => (v === '' || v == null ? 0 : Number(v));
@@ -93,8 +94,8 @@ export default function Health({ me }) {
           <>
             {meds.filter((m) => m.person === who).map((m) => (
               <div key={m.id} className="task" style={{ flexWrap: 'wrap', opacity: m.active === false ? 0.55 : 1 }}>
-                <input className="field" style={{ flex: '2 1 140px' }} value={m.name} onChange={(e) => save('med', { ...m, name: e.target.value }, m.id)} aria-label="Name" />
-                <input className="field" style={{ flex: '2 1 160px' }} value={m.schedule || ''} onChange={(e) => save('med', { ...m, schedule: e.target.value }, m.id)} placeholder="When / why" aria-label="Schedule" />
+                <Live className="field" style={{ flex: '2 1 140px' }} value={m.name} onSave={(v) => save('med', { ...m, name: v }, m.id)} aria-label="Name" />
+                <Live className="field" style={{ flex: '2 1 160px' }} value={m.schedule || ''} onSave={(v) => save('med', { ...m, schedule: v }, m.id)} placeholder="When / why" aria-label="Schedule" />
                 <input className="field" type="time" style={{ flex: '0 1 120px' }} value={m.time || ''} onChange={(e) => save('med', { ...m, time: e.target.value }, m.id)} aria-label="Reminder time" />
                 <label className="row" style={{ gap: 6, fontSize: 14 }}><input type="checkbox" checked={!!m.canSkip} onChange={(e) => save('med', { ...m, canSkip: e.target.checked }, m.id)} /> Can skip</label>
                 <button type="button" className="btn ghost small" onClick={() => save('med', { ...m, active: m.active === false }, m.id)}>{m.active === false ? 'Bring back' : 'Retire'}</button>
@@ -117,7 +118,7 @@ export default function Health({ me }) {
         <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
           {MACROS.map(([k, label, unit]) => (
             <div key={k} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <div className="row between" style={{ fontSize: 14 }}><b>{label}</b><span className="sub">{Math.round(tot[k])}{unit} of {editGoals ? <input className="field" type="number" style={{ width: 90, minHeight: 32, display: 'inline-block' }} value={goals[k]} onChange={(e) => setGoal(k, e.target.value)} aria-label={label + ' goal'} /> : goals[k]}{unit}</span></div>
+              <div className="row between" style={{ fontSize: 14 }}><b>{label}</b><span className="sub">{Math.round(tot[k])}{unit} of {editGoals ? <Live className="field" type="number" style={{ width: 90, minHeight: 32, display: 'inline-block' }} value={String(goals[k])} onSave={(v) => setGoal(k, v)} aria-label={label + ' goal'} /> : goals[k]}{unit}</span></div>
               <Bar value={tot[k]} goal={goals[k]} color={k === 'calories' ? 'var(--accent)' : color} />
             </div>
           ))}
@@ -149,7 +150,7 @@ export default function Health({ me }) {
             <span className="sub">glasses</span>
           </div>
           <Bar value={water} goal={goals.water} color="var(--hi)" />
-          {editGoals && <label className="lbl">Daily water goal (glasses)<input className="field" type="number" value={goals.water} onChange={(e) => setGoal('water', e.target.value)} /></label>}
+          {editGoals && <label className="lbl">Daily water goal (glasses)<Live className="field" type="number" value={String(goals.water)} onSave={(v) => setGoal('water', v)} /></label>}
         </section>
         <section className="card" aria-labelledby="ex-h">
           <h2 id="ex-h">Exercise</h2>

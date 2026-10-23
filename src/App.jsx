@@ -13,6 +13,9 @@ import Health from './screens/Health.jsx';
 import Calendar from './screens/Calendar.jsx';
 import Shared from './screens/Shared.jsx';
 import Library from './screens/Library.jsx';
+import GameDev from './screens/GameDev.jsx';
+import Video from './screens/Video.jsx';
+import Client from './screens/Client.jsx';
 import { startReminders } from './reminders.js';
 import { device } from './db.js';
 
@@ -54,6 +57,9 @@ export default function App() {
   else if (page === 'health') screen = <Health me={me} />;
   else if (page === 'calendar') screen = <Calendar me={me} />;
   else if (page === 'shared') screen = <Shared me={me} />;
+  else if (page === 'gamedev') screen = <GameDev me={me} />;
+  else if (page === 'video') screen = <Video me={me} />;
+  else if (page === 'client') screen = <Client me={me} />;
   else if (page === 'games') screen = <Library key="games" me={me} title="Games" sub="Playing, backlog and session notes" types={['game']} addPlaceholder="Add a game…" />;
   else if (page === 'books') screen = <Library key="books" me={me} title="Books & manga" sub="Manga, webtoons, comics and books" types={['manga', 'webtoon', 'comic', 'book']} addPlaceholder="Add something to read…" />;
   else if (page === 'shows') screen = <Library key="shows" me={me} title="Shows & movies" sub="What you're watching, episode by episode" types={['show', 'movie']} addPlaceholder="Add a show or movie…" />;
