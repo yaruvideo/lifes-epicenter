@@ -6,6 +6,9 @@ import { useItems } from '../store.js';
 import { STATUSES, TYPES, nextUp, progressText, statusLabel } from '../media.js';
 import MediaModal from './MediaModal.jsx';
 
+// Big libraries (hundreds of games from Obsidian or Steam) show a page at a time.
+const PAGE = 60;
+
 // Shared by Games, Books & manga, and Shows & movies; `types` decides which items show.
 export default function Library({ me, title, types, sub, addPlaceholder }) {
   const all = useItems('media');
@@ -16,6 +19,8 @@ export default function Library({ me, title, types, sub, addPlaceholder }) {
   const [sort, setSort] = useState('recent');
   const [q, setQ] = useState('');
   const [openId, setOpenId] = useState(null);
+  const [limit, setLimit] = useState(PAGE);
+  useEffect(() => setLimit(PAGE), [status, sort, q]);
   const open = items.find((m) => m.id === openId);
   const isGames = types.includes('game');
   const [hits, setHits] = useState([]);
@@ -64,6 +69,8 @@ export default function Library({ me, title, types, sub, addPlaceholder }) {
     .filter((m) => (status === 'all' || m.status === status) && m.title.toLowerCase().includes(q.toLowerCase()))
     .sort((a, b) => (sort === 'az' ? a.title.localeCompare(b.title) : (b.touched || 0) - (a.touched || 0)));
   const groups = sort === 'category' ? types.map((t) => [t, shown.filter((m) => m.type === t)]).filter(([, l]) => l.length) : [[null, shown]];
+  const count = (k) => (k === 'all' ? items.length : items.filter((m) => m.status === k).length);
+  const more = (n) => n > limit && <button type="button" className="btn ghost" style={{ alignSelf: 'center' }} onClick={() => setLimit(limit + PAGE * 2)}>Show more ({n - limit} left)</button>;
 
   const card = (m) => (
     <button key={m.id} type="button" className="theme" onClick={() => setOpenId(m.id)} style={{ gap: 6 }}>
@@ -123,21 +130,22 @@ export default function Library({ me, title, types, sub, addPlaceholder }) {
 
       <section className="card" aria-labelledby="lib-h">
         <div className="row between">
-          <h2 id="lib-h">Library</h2>
+          <h2 id="lib-h">Library · {shown.length}</h2>
           <div className="row">
             <input className="field" style={{ width: 200 }} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search your library" aria-label="Search" />
             <select className="field" style={{ width: 'auto' }} value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort"><option value="recent">Most recent</option>{types.length > 1 && <option value="category">Category</option>}<option value="az">A–Z</option></select>
           </div>
         </div>
         <div className="seg" role="group" aria-label="Status">
-          {[['all', 'All'], ...STATUSES].map(([k, l]) => <button key={k} type="button" aria-pressed={status === k} onClick={() => setStatus(k)}>{k === 'active' ? TYPES[types[0]].active : l}</button>)}
+          {[['all', 'All'], ...STATUSES].map(([k, l]) => <button key={k} type="button" aria-pressed={status === k} onClick={() => setStatus(k)}>{k === 'active' ? TYPES[types[0]].active : l} {count(k) || ''}</button>)}
         </div>
         {groups.map(([t, list]) => t ? (
           <details key={t} open>
             <summary style={{ cursor: 'pointer', fontWeight: 600, padding: '6px 0' }}>{TYPES[t].label}{t === 'manga' || t === 'comic' ? '' : 's'} · {list.length}</summary>
-            <div className="themes" style={{ marginTop: 8 }}>{list.map(card)}</div>
+            <div className="themes" style={{ marginTop: 8 }}>{list.slice(0, limit).map(card)}</div>
+            {more(list.length)}
           </details>
-        ) : <div key="all" className="themes">{list.length ? list.map(card) : <div className="empty">Nothing here yet.</div>}</div>)}
+        ) : <div key="all" style={{ display: 'contents' }}><div className="themes">{list.length ? list.slice(0, limit).map(card) : <div className="empty">Nothing here yet.</div>}</div>{more(list.length)}</div>)}
       </section>
       {open && <MediaModal key={open.id} item={open} types={types} me={me} onClose={() => setOpenId(null)} />}
     </>

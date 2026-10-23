@@ -51,6 +51,12 @@ export default function MediaModal({ item: start, types, me, onClose }) {
     <div className="modal-back" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal" role="dialog" aria-modal="true" aria-label={it.title}>
         <input className="field display" style={{ fontSize: 22, fontWeight: 600, background: 'transparent', border: 0, padding: 0 }} value={it.title} onChange={(e) => set({ title: e.target.value })} aria-label="Title" autoFocus />
+        {(it.year || it.series || it.author || it.genres?.length || it.steamAppId || it.link) && (
+          <div className="sub" style={{ fontSize: 13 }}>
+            {[it.year, it.series, it.author, it.genres?.join(', ')].filter(Boolean).join(' · ')}
+            {it.steamAppId ? <> · <a href={'https://store.steampowered.com/app/' + it.steamAppId} target="_blank" rel="noreferrer">Steam page</a></> : /^https?:/.test(it.link || '') ? <> · <a href={it.link} target="_blank" rel="noreferrer">Link</a></> : it.link ? ' · ' + it.link : null}
+          </div>
+        )}
         <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
           <label className="lbl">Type<select className="field" value={it.type} onChange={(e) => set({ type: e.target.value })}>{types.map((k) => <option key={k} value={k}>{TYPES[k].label}</option>)}</select></label>
           <label className="lbl">Status<select className="field" value={it.status} onChange={(e) => set({ status: e.target.value })}>{STATUSES.map(([k, l]) => <option key={k} value={k}>{k === 'active' ? t.active : l}</option>)}</select></label>
