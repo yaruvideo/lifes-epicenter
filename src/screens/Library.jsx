@@ -1,0 +1,103 @@
+import { useState } from 'react';
+import { save } from '../db.js';
+import { useItems } from '../store.js';
+import { STATUSES, TYPES, nextUp, progressText, statusLabel } from '../media.js';
+import MediaModal from './MediaModal.jsx';
+
+// Shared by Games, Books & manga, and Shows & movies; `types` decides which items show.
+export default function Library({ me, title, types, sub, addPlaceholder }) {
+  const all = useItems('media');
+  const notes = useItems('medianote');
+  const items = all.filter((m) => types.includes(m.type));
+  const [draft, setDraft] = useState({ title: '', type: types[0] });
+  const [status, setStatus] = useState('all');
+  const [sort, setSort] = useState('recent');
+  const [q, setQ] = useState('');
+  const [openId, setOpenId] = useState(null);
+  const open = items.find((m) => m.id === openId);
+
+  const add = (e) => {
+    e.preventDefault();
+    if (!draft.title.trim()) return;
+    const base = { title: draft.title.trim(), type: draft.type, status: 'active', added: Date.now(), touched: Date.now(), owner: me };
+    if (draft.type === 'show') base.parts = [{ id: crypto.randomUUID(), name: 'Season 1', episodes: null, watched: 0 }];
+    save('media', base).then((row) => setOpenId(row.id));
+    setDraft({ ...draft, title: '' });
+  };
+  const bump = (m) => {
+    if (m.type === 'show') { const n = nextUp(m); if (n) save('media', { ...m, touched: Date.now(), parts: m.parts.map((p, i) => (i === n.index ? { ...p, watched: n.ep } : p)) }, m.id); }
+    else save('media', { ...m, progress: (m.progress || 0) + 1, touched: Date.now() }, m.id);
+  };
+
+  const active = items.filter((m) => m.status === 'active').sort((a, b) => (b.touched || 0) - (a.touched || 0));
+  const ids = new Set(items.map((m) => m.id));
+  const feed = notes.filter((n) => ids.has(n.mediaId)).sort((a, b) => b.at - a.at).slice(0, 8);
+  const shown = items
+    .filter((m) => (status === 'all' || m.status === status) && m.title.toLowerCase().includes(q.toLowerCase()))
+    .sort((a, b) => (sort === 'az' ? a.title.localeCompare(b.title) : (b.touched || 0) - (a.touched || 0)));
+  const groups = sort === 'category' ? types.map((t) => [t, shown.filter((m) => m.type === t)]).filter(([, l]) => l.length) : [[null, shown]];
+
+  const card = (m) => (
+    <button key={m.id} type="button" className="theme" onClick={() => setOpenId(m.id)} style={{ gap: 6 }}>
+      <span className="row between" style={{ width: '100%' }}><span className="chip" style={{ background: 'var(--panel)', color: 'var(--muted)', border: '1px solid var(--border)' }}>{TYPES[m.type].label}</span>{m.rating ? <span className="display" style={{ color: 'var(--warm)' }}>{m.rating}/10</span> : null}</span>
+      <b style={{ lineHeight: 1.3 }}>{m.title}</b>
+      <span className="sub" style={{ fontSize: 13 }}>{statusLabel(m.type, m.status)}{progressText(m) ? ' · ' + progressText(m) : ''}</span>
+    </button>
+  );
+
+  return (
+    <>
+      <header><div className="sub">{sub}</div><h1>{title}</h1></header>
+      <form className="row" onSubmit={add}>
+        <input className="field" style={{ flex: '1 1 240px' }} value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} placeholder={addPlaceholder} aria-label="Title to add" />
+        {types.length > 1 && <select className="field" style={{ width: 'auto' }} value={draft.type} onChange={(e) => setDraft({ ...draft, type: e.target.value })} aria-label="Type">{types.map((t) => <option key={t} value={t}>{TYPES[t].label}</option>)}</select>}
+        <button className="btn" type="submit">Add</button>
+      </form>
+
+      <div className="grid">
+        <section className="card" aria-labelledby="cur-h">
+          <h2 id="cur-h">Currently {TYPES[types[0]].active.toLowerCase()}</h2>
+          {active.length ? active.map((m) => (
+            <div key={m.id} className="task">
+              <button type="button" className="title" onClick={() => setOpenId(m.id)}><b>{m.title}</b><span className="sub" style={{ display: 'block', fontSize: 13 }}>{progressText(m)}</span></button>
+              {m.type !== 'movie' && m.type !== 'game' && (m.type !== 'show' || nextUp(m)) && <button type="button" className="btn small" onClick={() => bump(m)}>{m.type === 'show' ? 'Watched Ep ' + nextUp(m).ep : '+1'}</button>}
+              <button type="button" className="btn ghost small" onClick={() => setOpenId(m.id)}>{m.type === 'game' ? 'Log session' : 'Open'}</button>
+            </div>
+          )) : <div className="empty">Nothing in progress. Add something above.</div>}
+        </section>
+        <section className="card" aria-labelledby="feed-h">
+          <h2 id="feed-h">Latest notes</h2>
+          {feed.length ? feed.map((n) => {
+            const m = items.find((x) => x.id === n.mediaId);
+            return (
+              <button key={n.id} type="button" className="note" onClick={() => setOpenId(n.mediaId)} style={{ textAlign: 'left', border: 0, cursor: 'pointer' }}>
+                <span className="row between"><b>{m?.title}</b><span className="sub" style={{ fontSize: 12 }}>{n.label}</span></span>
+                {n.text && <span style={{ display: 'block', marginTop: 4, whiteSpace: 'pre-wrap', maxHeight: 66, overflow: 'hidden' }}>{n.text}</span>}
+              </button>
+            );
+          }) : <div className="empty">Notes you write on any title show up here.</div>}
+        </section>
+      </div>
+
+      <section className="card" aria-labelledby="lib-h">
+        <div className="row between">
+          <h2 id="lib-h">Library</h2>
+          <div className="row">
+            <input className="field" style={{ width: 200 }} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search your library" aria-label="Search" />
+            <select className="field" style={{ width: 'auto' }} value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort"><option value="recent">Most recent</option>{types.length > 1 && <option value="category">Category</option>}<option value="az">A–Z</option></select>
+          </div>
+        </div>
+        <div className="seg" role="group" aria-label="Status">
+          {[['all', 'All'], ...STATUSES].map(([k, l]) => <button key={k} type="button" aria-pressed={status === k} onClick={() => setStatus(k)}>{k === 'active' ? TYPES[types[0]].active : l}</button>)}
+        </div>
+        {groups.map(([t, list]) => t ? (
+          <details key={t} open>
+            <summary style={{ cursor: 'pointer', fontWeight: 600, padding: '6px 0' }}>{TYPES[t].label}{t === 'manga' || t === 'comic' ? '' : 's'} · {list.length}</summary>
+            <div className="themes" style={{ marginTop: 8 }}>{list.map(card)}</div>
+          </details>
+        ) : <div key="all" className="themes">{list.length ? list.map(card) : <div className="empty">Nothing here yet.</div>}</div>)}
+      </section>
+      {open && <MediaModal key={open.id} item={open} types={types} me={me} onClose={() => setOpenId(null)} />}
+    </>
+  );
+}
