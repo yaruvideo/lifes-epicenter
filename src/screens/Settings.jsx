@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { exportBackup, importBackup } from '../db.js';
 import { useMe } from '../store.js';
 import { PEOPLE } from '../config.js';
+import { enablePush, pushEnabled } from '../push.js';
 import { createHousehold, currentUser, getClient, householdId, joinHousehold, keys, onStatus, saveKeys, start, syncNow } from '../sync.js';
 
 export default function Settings() {
@@ -115,12 +116,8 @@ export default function Settings() {
           ? <div><button type="button" className="btn" onClick={() => { installEvt.prompt(); setInstallEvt(null); }}>Install Life's Epicenter</button></div>
           : <div className="sub">On Windows, open this page in Edge or Chrome and use the install icon at the right end of the address bar. On Android, open it in Chrome and choose "Add to Home screen" (Install app).</div>}
         <div className="row">
-          <button type="button" className="btn ghost" onClick={async () => {
-            const p = await Notification.requestPermission();
-            if (p === 'granted') new Notification("Life's Epicenter", { body: 'Notifications are on.', icon: 'icon-192.png' });
-            else setMsg('Notifications are blocked. You can allow them in your browser\'s site settings.');
-          }}>Turn on notifications</button>
-          <span className="sub">Med and task reminders pop up while the app is open or minimized.</span>
+          <button type="button" className="btn ghost" onClick={() => run(() => enablePush(me), 'Notifications are on for this device.')}>{pushEnabled() ? 'Re-connect notifications' : 'Turn on notifications'}</button>
+          <span className="sub">Med times and task reminders arrive on this device, even when the app is closed. Do this once on each device (and again if you switch who uses it).</span>
         </div>
       </section>
 

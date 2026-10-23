@@ -7,3 +7,6 @@ export const PEOPLE = {
   yaru: { name: 'Yaru', color: '#A57CFF' },
   hannah: { name: 'Hannah', color: '#FF7EB6' }
 };
+
+// Public half of the key used to send reminders when the app is closed.
+export const VAPID_PUBLIC_KEY = 'BFyhm7u5N5mXcbJbxi8C3_tLhTsQujFX6BIEc2yijwrjCnTqz_aGHkQL28DcwHoNVuacNstNjcCs3wxu4W08WXE';

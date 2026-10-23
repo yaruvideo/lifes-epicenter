@@ -13,6 +13,9 @@ A shared life hub for two: tasks, journal, health, media and projects. It instal
 - **Library:** games (session notes, Play journal template), books/manga/webtoons/comics (batch chapter logging), shows (seasons/parts, next episode) and movies.
 - **Sections:** Game Dev (board, list, notes, docs, links), Video Projects (stages and templates), Client Work (projects overview, hours and timer, invoices, notes).
 - **Appearance:** 13 themes plus fine-tuning, per person. Reminders appear while the app is open or minimized.
+- **Steam:** store search when adding a game, and library import (needs the `STEAM_API_KEY` function secret).
+- **Notifications when closed:** the `push-reminders` function runs every 2 minutes (pg_cron) and sends Web Push for meds and task reminders to devices that turned notifications on.
+- **Claude's morning check-in:** a scheduled Claude task copies Google Calendar events in and leaves a note on Today (`claude_sync_gcal`, `claude_add_note`).
 - Everything saves on the device first and syncs through Supabase.
 
 ## One-time setup

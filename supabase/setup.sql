@@ -77,3 +77,12 @@ end $$;
 
 revoke execute on function create_household(), join_household(uuid), is_member(uuid) from anon, public;
 grant execute on function create_household(), join_household(uuid), is_member(uuid) to authenticated;
+
+-- Step 4 additions (already applied to the live project).
+-- Server-only secrets (VAPID keys for notifications) and a log of sent reminders.
+create table if not exists app_secrets (name text primary key, value text not null);
+alter table app_secrets enable row level security;
+create table if not exists push_sent (key text primary key, at timestamptz not null default now());
+alter table push_sent enable row level security;
+-- Every 2 minutes: select cron.schedule('push-reminders', '*/2 * * * *', $$select net.http_post(url := '<project>/functions/v1/push-reminders', headers := '{"Content-Type":"application/json"}'::jsonb, body := '{}'::jsonb)$$);
+-- Claude's morning check-in uses claude_sync_gcal(range_start, range_end, events) and claude_add_note(note, for_person).
