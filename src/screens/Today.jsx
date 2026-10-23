@@ -20,7 +20,7 @@ export default function Today({ me }) {
   const hello = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
   const start = new Date().setHours(0, 0, 0, 0);
   const show = tasks
-    .filter((t) => isToday(t) || (t.done && t.myDay && t.doneAt > start))
+    .filter((t) => isToday(t, tasks) || (t.done && t.myDay && t.doneAt > start))
     .filter((t) => who === 'both' || t.owner === who || t.owner === 'both')
     .sort((a, b) => a.done - b.done || (a.due || '9').localeCompare(b.due || '9'));
   const doneToday = tasks.filter((t) => t.done && t.doneAt > start).length;
@@ -42,7 +42,7 @@ export default function Today({ me }) {
       <div className="grid">
         <section className="card" aria-labelledby="today-h">
           <div className="row between"><h2 id="today-h">Today's tasks</h2><a href="#/tasks" className="sub">All tasks →</a></div>
-          {show.length ? show.map((t) => <TaskRow key={t.id} t={t} me={me} onCheck={onCheck} onOpen={onOpen} />) : <div className="empty">Nothing due today. Add something above, or tick "Show on Today" on any task.</div>}
+          {show.length ? show.map((t) => <TaskRow key={t.id} t={t} me={me} all={tasks} onCheck={onCheck} onOpen={onOpen} />) : <div className="empty">Nothing due today. Add something above, or tick "Show on Today" on any task.</div>}
           <div className="sub">{doneToday} done today</div>
         </section>
         <section className="card" aria-labelledby="meds-h">

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { newId, patch, remove } from '../db.js';
+import { newId, patch, remove, save } from '../db.js';
+import { useItems } from '../store.js';
 import { LISTS } from '../tasks.js';
 import { PEOPLE } from '../config.js';
 import { other } from '../store.js';
@@ -7,6 +8,7 @@ import { other } from '../store.js';
 export default function TaskModal({ task, me, onClose }) {
   const [t, setT] = useState(task);
   const [newSub, setNewSub] = useState('');
+  const others = useItems('task').filter((x) => x.id !== task.id && !x.done);
   const ref = useRef(null);
   useEffect(() => { ref.current?.focus(); }, []);
   useEffect(() => {
@@ -57,6 +59,12 @@ export default function TaskModal({ task, me, onClose }) {
               <option value="">Never</option><option value="daily">Daily</option><option value="weekdays">Weekdays</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option>
             </select>
           </label>
+          <label className="lbl">Waiting on
+            <select className="field" value={t.waitingOn || ''} onChange={(e) => set({ waitingOn: e.target.value || null })}>
+              <option value="">Nothing</option>
+              {others.map((o) => <option key={o.id} value={o.id}>{o.title}</option>)}
+            </select>
+          </label>
           <label className="lbl" style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 22 }}>
             <input type="checkbox" checked={!!t.myDay} onChange={(e) => set({ myDay: e.target.checked })} style={{ width: 20, height: 20, accentColor: 'var(--accent)' }} />
             Show on Today
@@ -72,6 +80,7 @@ export default function TaskModal({ task, me, onClose }) {
             <input className="field" style={{ background: 'transparent', border: 0, padding: 0, textDecoration: s.done ? 'line-through' : 'none' }} value={s.title} onChange={(e) => setSub(s.id, { title: e.target.value })} aria-label="Sub-task" />
             <input type="date" className="field" style={{ width: 150 }} value={s.due || ''} onChange={(e) => setSub(s.id, { due: e.target.value || null })} aria-label={'Due date for ' + s.title} title="Due" />
             <input type="datetime-local" className="field" style={{ width: 200 }} value={s.remindAt || ''} onChange={(e) => setSub(s.id, { remindAt: e.target.value || null })} aria-label={'Reminder for ' + s.title} title="Remind me" />
+            <button type="button" className="btn ghost small" title="Make into its own task" onClick={() => { save('task', { title: s.title, owner: t.owner, list: t.list, due: s.due || null, remindAt: s.remindAt || null, priority: null, repeat: null, notes: 'From: ' + t.title, subtasks: [], done: false, myDay: false, created: Date.now() }); set({ subtasks: t.subtasks.filter((x) => x.id !== s.id) }); }}>Make task</button>
             <button type="button" className="btn ghost small" onClick={() => set({ subtasks: t.subtasks.filter((x) => x.id !== s.id) })} aria-label={'Remove ' + s.title}>✕</button>
           </div>
         ))}

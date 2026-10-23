@@ -33,4 +33,6 @@ export async function completeTask(t, me, outcome = '') {
 
 export const undoTask = (t) => patch(t.id, { done: false, doneAt: null, doneBy: null });
 
-export const isToday = (t) => !t.done && (t.myDay || (t.due && t.due <= todayStr()));
+// A task waiting on another unfinished task stays off Today until that one is done.
+export const isBlocked = (t, all) => !!t.waitingOn && all.some((x) => x.id === t.waitingOn && !x.done);
+export const isToday = (t, all = []) => !t.done && !isBlocked(t, all) && (t.myDay || (t.due && t.due <= todayStr()));

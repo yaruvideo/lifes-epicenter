@@ -4,10 +4,16 @@ A shared life hub for two: tasks, journal, health, media and projects. It instal
 
 ## What works now
 
-- Today, Tasks (sub-tasks, priorities, due dates, repeats, wrap-up notes), Journal, Appearance (13 themes plus fine-tuning), Settings.
-- Everything saves on the device first, so it works with no internet.
-- Sync between devices once Supabase is connected.
-- Backup download and restore.
+- **Today:** tasks for today, meds due, macros for both of you.
+- **Tasks:** lists you can rearrange, sub-tasks (with their own due dates and reminders, or turned into tasks), priorities, repeats, "waiting on" another task, wrap-up notes that go to the Journal.
+- **Journal:** thoughts, finished tasks, media notes and exercise as one timeline.
+- **Calendar:** week view of events and due tasks.
+- **Health:** meds (with "Skip today" where allowed), macros, meals, water, exercise, for each person.
+- **Shared:** notes to each other, grocery list, the week together, shared tasks.
+- **Library:** games (session notes, Play journal template), books/manga/webtoons/comics (batch chapter logging), shows (seasons/parts, next episode) and movies.
+- **Sections:** Game Dev (board, list, notes, docs, links), Video Projects (stages and templates), Client Work (projects overview, hours and timer, invoices, notes).
+- **Appearance:** 13 themes plus fine-tuning, per person. Reminders appear while the app is open or minimized.
+- Everything saves on the device first and syncs through Supabase.
 
 ## One-time setup
 

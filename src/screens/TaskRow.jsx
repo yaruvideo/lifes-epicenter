@@ -1,7 +1,8 @@
 import { ownerLabel, ownerStyle, todayStr } from '../store.js';
-import { PRIORITY } from '../tasks.js';
+import { PRIORITY, isBlocked } from '../tasks.js';
 
-export default function TaskRow({ t, me, onCheck, onOpen }) {
+export default function TaskRow({ t, me, all = [], onCheck, onOpen }) {
+  const blocker = isBlocked(t, all) && all.find((x) => x.id === t.waitingOn);
   const subs = t.subtasks || [];
   const overdue = t.due && !t.done && t.due < todayStr();
   return (
@@ -10,7 +11,7 @@ export default function TaskRow({ t, me, onCheck, onOpen }) {
       <button type="button" className="title" onClick={() => onOpen(t)}>
         {t.title}
         <span className="sub" style={{ display: 'block', fontSize: 12 }}>
-          {[t.due && (overdue ? 'Overdue · ' : 'Due ') + t.due, t.repeat && '↻ ' + t.repeat, t.remindAt && '🔔 ' + t.remindAt.replace('T', ' '), subs.length && subs.filter((s) => s.done).length + '/' + subs.length + ' sub-tasks'].filter(Boolean).join(' · ')}
+          {[blocker && '🔒 Waiting on: ' + blocker.title, t.due && (overdue ? 'Overdue · ' : 'Due ') + t.due, t.repeat && '↻ ' + t.repeat, t.remindAt && '🔔 ' + t.remindAt.replace('T', ' '), subs.length && subs.filter((s) => s.done).length + '/' + subs.length + ' sub-tasks'].filter(Boolean).join(' · ')}
         </span>
       </button>
       {t.priority && <span className="chip" style={PRIORITY[t.priority]}>{t.priority}</span>}

@@ -73,7 +73,7 @@ export default function Shared({ me }) {
         <section className="card" aria-labelledby="st-h">
           <h2 id="st-h">Shared tasks</h2>
           <QuickAdd me={me} defaultOwner="both" placeholder="A task for both of you" />
-          {sharedTasks.length ? sharedTasks.map((t) => <TaskRow key={t.id} t={t} me={me} onCheck={onCheck} onOpen={onOpen} />) : <div className="empty">No shared tasks. Pick "Together" when adding one.</div>}
+          {sharedTasks.length ? sharedTasks.map((t) => <TaskRow key={t.id} t={t} me={me} all={tasks} onCheck={onCheck} onOpen={onOpen} />) : <div className="empty">No shared tasks. Pick "Together" when adding one.</div>}
         </section>
       </div>
       {overlays}
