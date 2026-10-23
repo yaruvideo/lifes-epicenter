@@ -30,6 +30,7 @@ export default function Settings() {
   };
   const auth = (mode) => run(async () => {
     const c = getClient();
+    if (!c) throw new Error('Sync isn\'t set up in this version. Close the app and open it again to load the latest update.');
     const { error } = mode === 'up'
       ? await c.auth.signUp({ email: form.email.trim(), password: form.password, options: { emailRedirectTo: location.origin + location.pathname } })
       : await c.auth.signInWithPassword({ email: form.email.trim(), password: form.password });
