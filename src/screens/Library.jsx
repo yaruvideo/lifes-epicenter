@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { device } from '../db.js';
+import { importSteamLibrary, searchSteam, steamImage } from '../steam.js';
 import { save } from '../db.js';
 import { useItems } from '../store.js';
 import { STATUSES, TYPES, nextUp, progressText, statusLabel } from '../media.js';
@@ -15,6 +17,32 @@ export default function Library({ me, title, types, sub, addPlaceholder }) {
   const [q, setQ] = useState('');
   const [openId, setOpenId] = useState(null);
   const open = items.find((m) => m.id === openId);
+  const isGames = types.includes('game');
+  const [hits, setHits] = useState([]);
+  const [steamMsg, setSteamMsg] = useState('');
+  const [importing, setImporting] = useState(false);
+  useEffect(() => {
+    if (!isGames || draft.title.trim().length < 3) { setHits([]); return; }
+    const t = setTimeout(() => searchSteam(draft.title.trim()).then(setHits).catch(() => setHits([])), 450);
+    return () => clearTimeout(t);
+  }, [draft.title, isGames]);
+  const addFromSteam = (h) => {
+    const id = 'steam-' + h.appid;
+    if (items.some((m) => m.id === id)) { setOpenId(id); setDraft({ ...draft, title: '' }); setHits([]); return; }
+    save('media', { title: h.name, type: 'game', steamAppId: h.appid, image: steamImage(h.appid), platform: 'Steam', status: 'active', added: Date.now(), touched: Date.now(), owner: me }, id).then((row) => setOpenId(row.id));
+    setDraft({ ...draft, title: '' }); setHits([]);
+  };
+  const runImport = async () => {
+    const profile = prompt('Paste your Steam profile link (or your Steam ID):', device.get('steam-profile', ''));
+    if (!profile) return;
+    device.set('steam-profile', profile);
+    setImporting(true); setSteamMsg('Importing from Steam…');
+    try {
+      const r = await importSteamLibrary(profile, me);
+      setSteamMsg('Imported ' + r.added + ' new games' + (r.updated ? ' and updated hours on ' + r.updated : '') + ' (' + r.total + ' on Steam). Games played in the last 2 weeks are under Playing; the rest are under Want to.');
+    } catch (e) { setSteamMsg('⚠ ' + e.message); }
+    setImporting(false);
+  };
 
   const add = (e) => {
     e.preventDefault();
@@ -39,6 +67,7 @@ export default function Library({ me, title, types, sub, addPlaceholder }) {
 
   const card = (m) => (
     <button key={m.id} type="button" className="theme" onClick={() => setOpenId(m.id)} style={{ gap: 6 }}>
+      {m.image && <img src={m.image} alt="" loading="lazy" style={{ width: '100%', aspectRatio: '460 / 215', objectFit: 'cover', borderRadius: 'var(--r)' }} onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
       <span className="row between" style={{ width: '100%' }}><span className="chip" style={{ background: 'var(--panel)', color: 'var(--muted)', border: '1px solid var(--border)' }}>{TYPES[m.type].label}</span>{m.rating ? <span className="display" style={{ color: 'var(--warm)' }}>{m.rating}/10</span> : null}</span>
       <b style={{ lineHeight: 1.3 }}>{m.title}</b>
       <span className="sub" style={{ fontSize: 13 }}>{statusLabel(m.type, m.status)}{progressText(m) ? ' · ' + progressText(m) : ''}</span>
@@ -52,7 +81,20 @@ export default function Library({ me, title, types, sub, addPlaceholder }) {
         <input className="field" style={{ flex: '1 1 240px' }} value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} placeholder={addPlaceholder} aria-label="Title to add" />
         {types.length > 1 && <select className="field" style={{ width: 'auto' }} value={draft.type} onChange={(e) => setDraft({ ...draft, type: e.target.value })} aria-label="Type">{types.map((t) => <option key={t} value={t}>{TYPES[t].label}</option>)}</select>}
         <button className="btn" type="submit">Add</button>
+        {isGames && <button type="button" className="btn ghost" disabled={importing} onClick={runImport}>Import Steam library</button>}
       </form>
+      {hits.length > 0 && (
+        <div className="card" style={{ padding: 10, gap: 6 }} aria-label="Steam matches">
+          <div className="sub" style={{ fontSize: 12 }}>From Steam (or press Add to use your own title)</div>
+          {hits.map((h) => (
+            <button key={h.appid} type="button" className="task" style={{ border: 0, cursor: 'pointer', textAlign: 'left' }} onClick={() => addFromSteam(h)}>
+              {h.image && <img src={h.image} alt="" width="92" height="35" style={{ borderRadius: 6, objectFit: 'cover' }} />}
+              <span style={{ flex: 1 }}>{h.name}</span><span className="sub" style={{ fontSize: 12 }}>Add</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {steamMsg && <div className="note" role="status">{steamMsg}</div>}
 
       <div className="grid">
         <section className="card" aria-labelledby="cur-h">
