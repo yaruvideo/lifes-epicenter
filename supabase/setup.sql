@@ -25,7 +25,15 @@ create table if not exists items (
 create index if not exists items_sync on items (household_id, synced_at);
 
 create or replace function touch_synced_at() returns trigger language plpgsql set search_path = public as $$
-begin new.synced_at := clock_timestamp(); return new; end $$;
+begin
+  -- Newest edit wins: an older copy arriving late never overwrites a newer one.
+  if tg_op = 'UPDATE' and new.updated_at < old.updated_at then
+    old.synced_at := clock_timestamp();
+    return old;
+  end if;
+  new.synced_at := clock_timestamp();
+  return new;
+end $$;
 drop trigger if exists items_touch on items;
 create trigger items_touch before insert or update on items for each row execute function touch_synced_at();
 

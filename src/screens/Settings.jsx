@@ -52,7 +52,7 @@ export default function Settings() {
 
   return (
     <>
-      <header><div className="sub">Settings</div><h1>Settings &amp; sync</h1></header>
+      <header><div className="sub">Settings</div><h1>Settings &amp; sync</h1><a href="#/appearance">Appearance and themes →</a></header>
       {msg && <div className="note" role="status">{msg}</div>}
 
       <section className="card" aria-labelledby="who-h">
@@ -120,7 +120,7 @@ export default function Settings() {
             if (p === 'granted') new Notification("Life's Epicenter", { body: 'Notifications are on.', icon: 'icon-192.png' });
             else setMsg('Notifications are blocked. You can allow them in your browser\'s site settings.');
           }}>Turn on notifications</button>
-          <span className="sub">Reminders get wired up in the next build step.</span>
+          <span className="sub">Med and task reminders pop up while the app is open or minimized.</span>
         </div>
       </section>
 

@@ -44,6 +44,9 @@ export default function TaskModal({ task, me, onClose }) {
           <label className="lbl">Due
             <input type="date" className="field" value={t.due || ''} onChange={(e) => set({ due: e.target.value || null })} />
           </label>
+          <label className="lbl">Remind me
+            <input type="datetime-local" className="field" value={t.remindAt || ''} onChange={(e) => set({ remindAt: e.target.value || null })} />
+          </label>
           <label className="lbl">Priority
             <select className="field" value={t.priority || ''} onChange={(e) => set({ priority: e.target.value || null })}>
               <option value="">None</option><option>High</option><option>Medium</option><option>Low</option>
@@ -67,7 +70,8 @@ export default function TaskModal({ task, me, onClose }) {
           <div key={s.id} className="task">
             <button type="button" className={'check' + (s.done ? ' done' : '')} aria-label={(s.done ? 'Mark not done: ' : 'Complete: ') + s.title} onClick={() => setSub(s.id, { done: !s.done })}>{s.done ? '✓' : ''}</button>
             <input className="field" style={{ background: 'transparent', border: 0, padding: 0, textDecoration: s.done ? 'line-through' : 'none' }} value={s.title} onChange={(e) => setSub(s.id, { title: e.target.value })} aria-label="Sub-task" />
-            <input type="date" className="field" style={{ width: 150 }} value={s.due || ''} onChange={(e) => setSub(s.id, { due: e.target.value || null })} aria-label={'Due date for ' + s.title} />
+            <input type="date" className="field" style={{ width: 150 }} value={s.due || ''} onChange={(e) => setSub(s.id, { due: e.target.value || null })} aria-label={'Due date for ' + s.title} title="Due" />
+            <input type="datetime-local" className="field" style={{ width: 200 }} value={s.remindAt || ''} onChange={(e) => setSub(s.id, { remindAt: e.target.value || null })} aria-label={'Reminder for ' + s.title} title="Remind me" />
             <button type="button" className="btn ghost small" onClick={() => set({ subtasks: t.subtasks.filter((x) => x.id !== s.id) })} aria-label={'Remove ' + s.title}>✕</button>
           </div>
         ))}

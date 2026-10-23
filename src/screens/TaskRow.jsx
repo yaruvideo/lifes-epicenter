@@ -10,7 +10,7 @@ export default function TaskRow({ t, me, onCheck, onOpen }) {
       <button type="button" className="title" onClick={() => onOpen(t)}>
         {t.title}
         <span className="sub" style={{ display: 'block', fontSize: 12 }}>
-          {[t.due && (overdue ? 'Overdue · ' : 'Due ') + t.due, t.repeat && '↻ ' + t.repeat, subs.length && subs.filter((s) => s.done).length + '/' + subs.length + ' sub-tasks'].filter(Boolean).join(' · ')}
+          {[t.due && (overdue ? 'Overdue · ' : 'Due ') + t.due, t.repeat && '↻ ' + t.repeat, t.remindAt && '🔔 ' + t.remindAt.replace('T', ' '), subs.length && subs.filter((s) => s.done).length + '/' + subs.length + ' sub-tasks'].filter(Boolean).join(' · ')}
         </span>
       </button>
       {t.priority && <span className="chip" style={PRIORITY[t.priority]}>{t.priority}</span>}

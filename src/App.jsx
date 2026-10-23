@@ -9,10 +9,13 @@ import Journal from './screens/Journal.jsx';
 import Appearance from './screens/Appearance.jsx';
 import Settings from './screens/Settings.jsx';
 import Soon from './screens/Soon.jsx';
+import Health from './screens/Health.jsx';
+import { startReminders } from './reminders.js';
+import { device } from './db.js';
 
 const MAIN = [
   ['today', 'Today'], ['journal', 'Journal'], ['tasks', 'Tasks'],
-  ['calendar', 'Calendar', true], ['health', 'Health & macros', true], ['shared', 'Shared with Hannah', true]
+  ['calendar', 'Calendar', true], ['health', 'Health & macros'], ['shared', 'Shared with Hannah', true]
 ];
 const LIBRARY = [['games', 'Games'], ['books', 'Books & manga'], ['shows', 'Shows & movies']];
 const SECTIONS = [['gamedev', 'Game Dev', '#FF9F45'], ['video', 'Video Projects', '#F2545B'], ['client', 'Client Work', '#7FA8F5']];
@@ -32,7 +35,7 @@ export default function App() {
     return () => window.removeEventListener('hashchange', h);
   }, []);
   useEffect(() => onStatus(setSync), []);
-  useEffect(() => { start(); }, []);
+  useEffect(() => { start(); return startReminders(() => device.get('me', 'yaru')); }, []);
 
   const look = looks.find((l) => l.id === 'look-' + me) || { ...DEFAULT_LOOK, theme: me === 'hannah' ? 'classic' : 'eva01' };
   useEffect(() => { applyLook(look); }, [JSON.stringify(look)]);
@@ -45,6 +48,7 @@ export default function App() {
   if (page === 'today') screen = <Today me={me} />;
   else if (page === 'tasks') screen = <Tasks me={me} />;
   else if (page === 'journal') screen = <Journal me={me} />;
+  else if (page === 'health') screen = <Health me={me} />;
   else if (page === 'appearance') screen = <Appearance me={me} look={look} />;
   else if (page === 'settings') screen = <Settings />;
   else screen = <Soon name={NAMES[page] || 'This page'} />;
@@ -64,7 +68,7 @@ export default function App() {
       </nav>
       <main>{screen}</main>
       <nav className="mobilebar" aria-label="Main">
-        {[['today', 'Today'], ['tasks', 'Tasks'], ['journal', 'Journal'], ['appearance', 'Look'], ['settings', 'Settings']].map(([id, label]) => (
+        {[['today', 'Today'], ['tasks', 'Tasks'], ['health', 'Health'], ['journal', 'Journal'], ['settings', 'More']].map(([id, label]) => (
           <a key={id} href={'#/' + id} className={page === id ? 'on' : ''}>{label}</a>
         ))}
       </nav>
