@@ -3,9 +3,9 @@ import { addTask } from '../tasks.js';
 import { other } from '../store.js';
 import { PEOPLE } from '../config.js';
 
-export default function QuickAdd({ me, extra, placeholder = 'Add a task…' }) {
+export default function QuickAdd({ me, extra, placeholder = 'Add a task…', defaultOwner }) {
   const [title, setTitle] = useState('');
-  const [owner, setOwner] = useState(me);
+  const [owner, setOwner] = useState(defaultOwner || me);
   const submit = (e) => {
     e.preventDefault();
     if (!title.trim()) return;

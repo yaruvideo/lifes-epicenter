@@ -10,12 +10,14 @@ import Appearance from './screens/Appearance.jsx';
 import Settings from './screens/Settings.jsx';
 import Soon from './screens/Soon.jsx';
 import Health from './screens/Health.jsx';
+import Calendar from './screens/Calendar.jsx';
+import Shared from './screens/Shared.jsx';
 import { startReminders } from './reminders.js';
 import { device } from './db.js';
 
 const MAIN = [
   ['today', 'Today'], ['journal', 'Journal'], ['tasks', 'Tasks'],
-  ['calendar', 'Calendar', true], ['health', 'Health & macros'], ['shared', 'Shared with Hannah', true]
+  ['calendar', 'Calendar'], ['health', 'Health & macros'], ['shared', 'Shared with Hannah']
 ];
 const LIBRARY = [['games', 'Games'], ['books', 'Books & manga'], ['shows', 'Shows & movies']];
 const SECTIONS = [['gamedev', 'Game Dev', '#FF9F45'], ['video', 'Video Projects', '#F2545B'], ['client', 'Client Work', '#7FA8F5']];
@@ -49,6 +51,8 @@ export default function App() {
   else if (page === 'tasks') screen = <Tasks me={me} />;
   else if (page === 'journal') screen = <Journal me={me} />;
   else if (page === 'health') screen = <Health me={me} />;
+  else if (page === 'calendar') screen = <Calendar me={me} />;
+  else if (page === 'shared') screen = <Shared me={me} />;
   else if (page === 'appearance') screen = <Appearance me={me} look={look} />;
   else if (page === 'settings') screen = <Settings />;
   else screen = <Soon name={NAMES[page] || 'This page'} />;
