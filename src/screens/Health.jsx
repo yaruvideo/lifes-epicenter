@@ -3,7 +3,7 @@ import { remove, save } from '../db.js';
 import { useItems, other, todayStr } from '../store.js';
 import { PEOPLE } from '../config.js';
 import Live from './Live.jsx';
-import { DEFAULT_GOALS, MACROS, logMed, medLogId, seedMedsIfEmpty, totals } from '../health.js';
+import { ACTIVITY, GOAL_ADJUST, DEFAULT_GOALS, MACROS, calcTargets, goalsFor, latestWeight, logMed, medLogId, seedMedsIfEmpty, totals } from '../health.js';
 
 const num = (v) => (v === '' || v == null ? 0 : Number(v));
 
@@ -17,6 +17,8 @@ export default function Health({ me }) {
   const meds = useItems('med');
   const logs = useItems('medlog');
   const goalsAll = useItems('goals');
+  const weights = useItems('weight');
+  const [wIn, setWIn] = useState('');
   const meals = useItems('meal');
   const waters = useItems('water');
   const exercise = useItems('exercise');
@@ -34,13 +36,25 @@ export default function Health({ me }) {
   const logOf = (m) => logs.find((l) => l.id === medLogId(m.id, today));
   const due = myMeds.filter((m) => !logOf(m));
   const handled = myMeds.filter((m) => logOf(m));
-  const goals = { ...DEFAULT_GOALS, ...(goalsAll.find((g) => g.id === 'goals-' + who) || {}) };
+  const stored = { ...DEFAULT_GOALS, ...(goalsAll.find((g) => g.id === 'goals-' + who) || {}) };
+  const goals = goalsFor(who, goalsAll, weights);
+  const lastW = latestWeight(who, weights);
+  const preview = calcTargets(stored, lastW?.lb);
+  const myWeights = weights.filter((w) => w.person === who).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6);
+  const setBody = (c) => save('goals', { ...stored, ...c }, 'goals-' + who);
+  const logWeight = (e) => {
+    e.preventDefault();
+    const lb = Number(wIn);
+    if (!lb) return;
+    save('weight', { person: who, date: today, lb, at: Date.now() }, 'weight-' + who + '-' + today);
+    setWIn('');
+  };
   const todaysMeals = meals.filter((m) => m.person === who && m.date === today).sort((a, b) => a.at - b.at);
   const tot = totals(todaysMeals);
   const water = waters.find((w) => w.id === 'water-' + who + '-' + today)?.count || 0;
   const todaysEx = exercise.filter((e) => e.person === who && e.date === today);
 
-  const setGoal = (k, v) => save('goals', { ...goals, [k]: num(v) }, 'goals-' + who);
+  const setGoal = (k, v) => save('goals', { ...stored, [k]: num(v) }, 'goals-' + who);
   const setWater = (n) => save('water', { person: who, date: today, count: Math.max(0, n) }, 'water-' + who + '-' + today);
   const addMeal = (e) => {
     e.preventDefault();
@@ -114,7 +128,8 @@ export default function Health({ me }) {
       </section>
 
       <section className="card" aria-labelledby="mac-h">
-        <div className="row between"><h2 id="mac-h">Macros today</h2><button type="button" className="btn ghost small" onClick={() => setEditGoals(!editGoals)}>{editGoals ? 'Done' : 'Edit goals'}</button></div>
+        <div className="row between"><h2 id="mac-h">Macros today</h2>{!stored.auto && <button type="button" className="btn ghost small" onClick={() => setEditGoals(!editGoals)}>{editGoals ? 'Done' : 'Edit goals'}</button>}</div>
+        <div className="sub" style={{ fontSize: 13 }}>{stored.auto ? (preview ? 'Targets worked out from body stats and latest weight (' + lastW.lb + ' lb).' : 'Add body stats and a weight below to work out targets.') : 'Using goals you typed in. Turn on "Work out my targets" below to use the formula.'}</div>
         <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
           {MACROS.map(([k, label, unit]) => (
             <div key={k} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -123,6 +138,31 @@ export default function Health({ me }) {
             </div>
           ))}
         </div>
+      </section>
+
+      <section className="card" aria-labelledby="body-h">
+        <div className="row between">
+          <h2 id="body-h">Body &amp; targets</h2>
+          <label className="row" style={{ gap: 8 }}><input type="checkbox" checked={!!stored.auto} onChange={(e) => setBody({ auto: e.target.checked })} style={{ width: 20, height: 20, accentColor: 'var(--accent)' }} /> Work out my targets</label>
+        </div>
+        <form className="row" onSubmit={logWeight}>
+          <span><b>Weight</b> {lastW ? <span className="sub">· latest {lastW.lb} lb on {lastW.date}</span> : <span className="sub">· none logged yet</span>}</span>
+          <input className="field" type="number" step="0.1" inputMode="decimal" style={{ width: 120 }} value={wIn} onChange={(e) => setWIn(e.target.value)} placeholder="lb" aria-label="Today's weight in pounds" />
+          <button className="btn small" type="submit">Log weight</button>
+          {myWeights.length > 1 && <span className="sub" style={{ fontSize: 13 }}>{myWeights.map((w) => w.lb).join(' ← ')}</span>}
+        </form>
+        <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
+          <label className="lbl">Sex (for the formula)<select className="field" value={stored.sex || ''} onChange={(e) => setBody({ sex: e.target.value })}><option value="">Pick one</option><option value="male">Male</option><option value="female">Female</option></select></label>
+          <label className="lbl">Age<Live className="field" type="number" value={String(stored.age || '')} onSave={(v) => setBody({ age: num(v) || null })} /></label>
+          <label className="lbl">Height (ft)<Live className="field" type="number" value={stored.heightIn ? String(Math.floor(stored.heightIn / 12)) : ''} onSave={(v) => setBody({ heightIn: num(v) * 12 + ((stored.heightIn || 0) % 12) })} /></label>
+          <label className="lbl">Height (in)<Live className="field" type="number" value={stored.heightIn ? String(stored.heightIn % 12) : ''} onSave={(v) => setBody({ heightIn: Math.floor((stored.heightIn || 0) / 12) * 12 + num(v) })} /></label>
+          <label className="lbl">Activity<select className="field" value={String(stored.activity || '1.375')} onChange={(e) => setBody({ activity: e.target.value })}>{ACTIVITY.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+          <label className="lbl">Goal<select className="field" value={String(stored.adjust || '0')} onChange={(e) => setBody({ adjust: e.target.value })}>{GOAL_ADJUST.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+          <label className="lbl">Protein per lb<select className="field" value={String(stored.proteinPerLb || '0.8')} onChange={(e) => setBody({ proteinPerLb: e.target.value })}>{['0.6', '0.7', '0.8', '0.9', '1', '1.1'].map((v) => <option key={v} value={v}>{v} g</option>)}</select></label>
+          <label className="lbl">Fat share<select className="field" value={String(stored.fatPct || '25')} onChange={(e) => setBody({ fatPct: e.target.value })}>{['20', '25', '30', '35'].map((v) => <option key={v} value={v}>{v}% of calories</option>)}</select></label>
+        </div>
+        {preview && <div className="note">Burns about <b>{preview.bmr}</b> cal at rest. Daily targets: <b>{preview.calories}</b> cal · protein <b>{preview.protein}g</b> · carbs <b>{preview.carbs}g</b> · fat <b>{preview.fat}g</b> · water <b>{preview.water}</b> glasses.{!stored.auto && ' Tick "Work out my targets" to use these.'}</div>}
+        <div className="sub" style={{ fontSize: 12 }}>Uses the Mifflin-St Jeor formula. Protein comes from your weight, fat from the share you pick, carbs fill the rest. Targets update every time you log a new weight. These are estimates, so check with a doctor or dietitian for medical needs.</div>
       </section>
 
       <section className="card" aria-labelledby="meal-h">

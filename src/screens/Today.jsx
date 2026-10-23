@@ -6,7 +6,7 @@ import TaskRow from './TaskRow.jsx';
 import QuickAdd from './QuickAdd.jsx';
 import useTaskActions from './useTaskActions.jsx';
 import { todayStr } from '../store.js';
-import { DEFAULT_GOALS, logMed, medLogId, totals } from '../health.js';
+import { goalsFor, logMed, medLogId, totals } from '../health.js';
 
 export default function Today({ me }) {
   const tasks = useItems('task');
@@ -14,6 +14,7 @@ export default function Today({ me }) {
   const logs = useItems('medlog');
   const meals = useItems('meal');
   const goalsAll = useItems('goals');
+  const weights = useItems('weight');
   const [who, setWho] = useState('both');
   const { onCheck, onOpen, overlays } = useTaskActions(me);
   const hour = new Date().getHours();
@@ -66,7 +67,7 @@ export default function Today({ me }) {
         <section className="card" aria-labelledby="mac-h">
           <div className="row between"><h2 id="mac-h">Macros</h2><a href="#/health" className="sub">Log a meal →</a></div>
           {[me, other(me)].filter((p) => who === 'both' || p === who).map((p) => {
-            const g = { ...DEFAULT_GOALS, ...(goalsAll.find((x) => x.id === 'goals-' + p) || {}) };
+            const g = goalsFor(p, goalsAll, weights);
             const t = totals(meals.filter((m) => m.person === p && m.date === todayStr()));
             return (
               <div key={p} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
