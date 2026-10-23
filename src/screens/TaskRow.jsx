@@ -1,0 +1,20 @@
+import { ownerLabel, ownerStyle, todayStr } from '../store.js';
+import { PRIORITY } from '../tasks.js';
+
+export default function TaskRow({ t, me, onCheck, onOpen }) {
+  const subs = t.subtasks || [];
+  const overdue = t.due && !t.done && t.due < todayStr();
+  return (
+    <div className={'task' + (t.done ? ' isdone' : '')}>
+      <button type="button" className={'check' + (t.done ? ' done' : '')} aria-label={(t.done ? 'Mark not done: ' : 'Complete: ') + t.title} onClick={() => onCheck(t)}>{t.done ? '✓' : ''}</button>
+      <button type="button" className="title" onClick={() => onOpen(t)}>
+        {t.title}
+        <span className="sub" style={{ display: 'block', fontSize: 12 }}>
+          {[t.due && (overdue ? 'Overdue · ' : 'Due ') + t.due, t.repeat && '↻ ' + t.repeat, subs.length && subs.filter((s) => s.done).length + '/' + subs.length + ' sub-tasks'].filter(Boolean).join(' · ')}
+        </span>
+      </button>
+      {t.priority && <span className="chip" style={PRIORITY[t.priority]}>{t.priority}</span>}
+      <span className="chip" style={ownerStyle(t.owner)}>{ownerLabel(t.owner, me)}</span>
+    </div>
+  );
+}
