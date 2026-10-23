@@ -78,7 +78,7 @@ export default function Calendar({ me }) {
         <span className="row" style={{ gap: 6 }}><span className="dot" style={{ background: PEOPLE[other(me)].color }} />{PEOPLE[other(me)].name}</span>
         <span className="row" style={{ gap: 6 }}><span className="dot" style={{ background: 'var(--hi)' }} />Together</span>
         <span className="row" style={{ gap: 6 }}><span className="dot" style={{ border: '2px dashed var(--muted)' }} />Task due</span>
-        <span>Google Calendar sync comes in the next step.</span>
+        <span>Google Calendar events are copied in each morning by Claude (edit those in Google Calendar).</span>
       </div>
       <div className="row" style={{ alignItems: 'flex-start', gap: 16 }}>
         <div style={{ flex: '999 1 600px', minWidth: 0, overflowX: 'auto' }}>
@@ -113,7 +113,7 @@ export default function Calendar({ me }) {
           {draft && <><h2>New event</h2>{form(draft, (c) => setDraft({ ...draft, ...c }), saveDraft, 'Save event')}</>}
           {!draft && selected && (
             <>
-              <div className="sub">{ownerLabel(selected.who, me)}</div>
+              <div className="sub">{ownerLabel(selected.who, me)}{selected.source === 'google' ? ' · from Google Calendar (' + (selected.calendar || 'Google') + '). Changes here stay in the app only.' : ''}</div>
               {form(selected, edit)}
               <button type="button" className="btn ghost small" onClick={() => { if (confirm('Delete "' + selected.title + '"?')) { remove(selected.id); setSel(null); } }}>Delete event</button>
             </>

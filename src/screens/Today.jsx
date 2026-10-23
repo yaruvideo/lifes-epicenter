@@ -15,6 +15,8 @@ export default function Today({ me }) {
   const meals = useItems('meal');
   const goalsAll = useItems('goals');
   const weights = useItems('weight');
+  const claudeNotes = useItems('claudenote');
+  const events = useItems('event');
   const [who, setWho] = useState('both');
   const { onCheck, onOpen, overlays } = useTaskActions(me);
   const hour = new Date().getHours();
@@ -45,6 +47,26 @@ export default function Today({ me }) {
           <div className="row between"><h2 id="today-h">Today's tasks</h2><a href="#/tasks" className="sub">All tasks →</a></div>
           {show.length ? show.map((t) => <TaskRow key={t.id} t={t} me={me} all={tasks} onCheck={onCheck} onOpen={onOpen} />) : <div className="empty">Nothing due today. Add something above, or tick "Show on Today" on any task.</div>}
           <div className="sub">{doneToday} done today</div>
+        </section>
+        {(() => {
+          const n = claudeNotes.filter((x) => !x.for || x.for === me).sort((a, b) => b.at - a.at)[0];
+          if (!n) return null;
+          return (
+            <section className="card" aria-labelledby="claude-h" style={{ borderColor: 'var(--accent)' }}>
+              <div className="row between"><h2 id="claude-h">Morning note from Claude</h2><span className="sub" style={{ fontSize: 12 }}>{new Date(n.at).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })}</span></div>
+              <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.55 }}>{n.text}</div>
+            </section>
+          );
+        })()}
+        <section className="card" aria-labelledby="up-h">
+          <div className="row between"><h2 id="up-h">Up next</h2><a href="#/calendar" className="sub">Calendar →</a></div>
+          {(() => {
+            const day = todayStr();
+            const list = events.filter((e) => e.date === day && (who === 'both' || e.who === who || e.who === 'both')).sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+            return list.length ? list.map((e) => (
+              <div key={e.id} className="task"><span className="sub" style={{ flex: '0 0 64px', fontSize: 13 }}>{e.time || 'All day'}</span><b style={{ flex: 1 }}>{e.title}</b>{e.source === 'google' && <span className="chip" style={{ background: 'var(--inner)', color: 'var(--muted)', border: '1px solid var(--border)' }}>{e.calendar || 'Google'}</span>}</div>
+            )) : <div className="empty">Nothing on the calendar today.</div>;
+          })()}
         </section>
         <section className="card" aria-labelledby="meds-h">
           <div className="row between"><h2 id="meds-h">Meds due</h2><a href="#/health" className="sub">Health →</a></div>
