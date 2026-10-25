@@ -35,7 +35,7 @@ export function totals(meals) {
 // Macro targets worked out from body stats (Mifflin-St Jeor + activity level).
 // These are everyday estimates, not medical advice.
 export const ACTIVITY = [['1.2', 'Mostly sitting'], ['1.375', 'Light (1–3 workouts/week)'], ['1.55', 'Moderate (3–5/week)'], ['1.725', 'Very active (6–7/week)']];
-export const GOAL_ADJUST = [['-500', 'Lose (about 1 lb/week)'], ['-250', 'Lose slowly'], ['0', 'Maintain'], ['250', 'Gain slowly'], ['500', 'Gain']];
+export const GOAL_ADJUST = [['-1000', 'Lose faster (about 2 lb/week)'], ['-500', 'Lose (about 1 lb/week)'], ['-250', 'Lose slowly'], ['0', 'Maintain'], ['250', 'Gain slowly'], ['500', 'Gain']];
 
 export function latestWeight(person, weights) {
   return weights.filter((w) => w.person === person).sort((a, b) => b.date.localeCompare(a.date) || b.at - a.at)[0] || null;
@@ -45,7 +45,9 @@ export function calcTargets(p, weightLb) {
   if (!weightLb || !p.heightIn || !p.age) return null;
   const kg = weightLb * 0.4536, cm = p.heightIn * 2.54;
   const bmr = 10 * kg + 6.25 * cm - 5 * p.age + (p.sex === 'female' ? -161 : 5);
-  const calories = Math.round((bmr * Number(p.activity || 1.375) + Number(p.adjust || 0)) / 10) * 10;
+  // Never aim below a common safe floor (1500 men, 1200 women), even on the 2 lb/week goal.
+  const floor = p.sex === 'female' ? 1200 : 1500;
+  const calories = Math.max(floor, Math.round((bmr * Number(p.activity || 1.375) + Number(p.adjust || 0)) / 10) * 10);
   const protein = Math.round(weightLb * Number(p.proteinPerLb || 0.8));
   const fat = Math.round((calories * Number(p.fatPct || 25)) / 100 / 9);
   const carbs = Math.max(0, Math.round((calories - protein * 4 - fat * 9) / 4));
