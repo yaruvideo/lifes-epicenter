@@ -3,6 +3,7 @@ import { remove, save } from '../db.js';
 import { useItems, other, todayStr } from '../store.js';
 import { PEOPLE } from '../config.js';
 import Live from './Live.jsx';
+import { macroLine } from './Recipes.jsx';
 import { ACTIVITY, GOAL_ADJUST, DEFAULT_GOALS, MACROS, calcTargets, goalsFor, latestWeight, logMed, medLogId, seedMedsIfEmpty, totals } from '../health.js';
 
 const num = (v) => (v === '' || v == null ? 0 : Number(v));
@@ -25,6 +26,12 @@ export default function Health({ me }) {
   const [editMeds, setEditMeds] = useState(false);
   const [editGoals, setEditGoals] = useState(false);
   const [meal, setMeal] = useState({ name: '', calories: '', protein: '', carbs: '', fat: '' });
+  const recipes = useItems('recipe');
+  const [pick, setPick] = useState(null);
+  const [servings, setServings] = useState('1');
+  const [menu, setMenu] = useState(false);
+  const [hl, setHl] = useState(0);
+  const [keep, setKeep] = useState(false);
   const [ex, setEx] = useState({ what: '', minutes: '' });
   const [newMed, setNewMed] = useState({ name: '', schedule: '', time: '08:00', canSkip: false });
 
@@ -56,11 +63,27 @@ export default function Health({ me }) {
 
   const setGoal = (k, v) => save('goals', { ...stored, [k]: num(v) }, 'goals-' + who);
   const setWater = (n) => save('water', { person: who, date: today, count: Math.max(0, n) }, 'water-' + who + '-' + today);
+  const mq = meal.name.trim().toLowerCase();
+  const matches = mq && !pick ? recipes.filter((r) => (r.name || '').toLowerCase().includes(mq)).sort((a, b) => (a.name.toLowerCase().startsWith(mq) ? 0 : 1) - (b.name.toLowerCase().startsWith(mq) ? 0 : 1) || a.name.localeCompare(b.name)).slice(0, 6) : [];
+  const showMenu = menu && matches.length > 0;
+  const scaled = (r, n) => Object.fromEntries(MACROS.map(([k]) => [k, String(Math.round((r[k] || 0) * (num(n) || 0) * 10) / 10)]));
+  const choose = (r) => { setPick(r); setServings('1'); setMeal({ name: r.name, ...scaled(r, 1) }); setMenu(false); };
+  const setServ = (n) => { setServings(n); if (pick) setMeal({ ...meal, ...scaled(pick, n) }); };
+  const mealKey = (e) => {
+    if (!showMenu) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); setHl((hl + 1) % matches.length); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setHl((hl - 1 + matches.length) % matches.length); }
+    else if (e.key === 'Enter') { e.preventDefault(); choose(matches[hl] || matches[0]); }
+    else if (e.key === 'Escape') setMenu(false);
+  };
   const addMeal = (e) => {
     e.preventDefault();
     if (!meal.name.trim()) return;
-    save('meal', { person: who, date: today, at: Date.now(), name: meal.name.trim(), calories: num(meal.calories), protein: num(meal.protein), carbs: num(meal.carbs), fat: num(meal.fat) });
+    const m = { name: meal.name.trim(), calories: num(meal.calories), protein: num(meal.protein), carbs: num(meal.carbs), fat: num(meal.fat) };
+    save('meal', { person: who, date: today, at: Date.now(), ...m, ...(pick ? { recipe: pick.id, servings: num(servings) } : {}) });
+    if (!pick && keep) save('recipe', { ...m, servings: 1, ingredients: '', steps: '', tags: '', link: '', by: me, added: Date.now() });
     setMeal({ name: '', calories: '', protein: '', carbs: '', fat: '' });
+    setPick(null); setServings('1'); setKeep(false);
   };
   const addEx = (e) => {
     e.preventDefault();
@@ -140,6 +163,35 @@ export default function Health({ me }) {
         </div>
       </section>
 
+      <section className="card" aria-labelledby="meal-h">
+        <h2 id="meal-h">Meals</h2>
+        {todaysMeals.map((m) => (
+          <div key={m.id} className="task">
+            <div style={{ flex: 1 }}><b>{m.name}</b><div className="sub" style={{ fontSize: 13 }}>{m.calories} cal · P {m.protein}g · C {m.carbs}g · F {m.fat}g</div></div>
+            <button type="button" className="btn ghost small" aria-label={'Remove ' + m.name} onClick={() => remove(m.id)}>✕</button>
+          </div>
+        ))}
+        <form className="row" onSubmit={addMeal}>
+          <div style={{ flex: '3 1 180px', position: 'relative' }}>
+            <input className="field" style={{ width: '100%' }} value={meal.name} onChange={(e) => { setMeal({ ...meal, name: e.target.value }); setPick(null); setMenu(true); setHl(0); }} onKeyDown={mealKey} onFocus={() => setMenu(true)} onBlur={() => setTimeout(() => setMenu(false), 150)} placeholder={recipes.length ? 'Meal or recipe…' : 'What did you eat?'} aria-label="Meal" role="combobox" aria-expanded={showMenu} aria-controls="recipe-menu" aria-autocomplete="list" />
+            {showMenu && (
+              <div id="recipe-menu" role="listbox" style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4, zIndex: 5, background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 'var(--r)', boxShadow: '0 8px 24px rgba(0,0,0,.35)', overflow: 'hidden' }}>
+                {matches.map((r, i) => (
+                  <div key={r.id} role="option" aria-selected={i === hl} onMouseDown={(e) => { e.preventDefault(); choose(r); }} onMouseEnter={() => setHl(i)} style={{ padding: '8px 12px', cursor: 'pointer', background: i === hl ? 'var(--inner)' : 'transparent' }}>
+                    <b>{r.name}</b><div className="sub" style={{ fontSize: 12 }}>{macroLine(r)} per serving</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          {pick && <label className="row" style={{ gap: 6, fontSize: 14, flex: '0 1 auto' }}>Servings<input className="field" type="number" min="0" step="0.25" inputMode="decimal" style={{ width: 80 }} value={servings} onChange={(e) => setServ(e.target.value)} aria-label="Servings" /></label>}
+          {MACROS.map(([k, label]) => <input key={k} className="field" type="number" inputMode="decimal" style={{ flex: '1 1 80px' }} value={meal[k]} onChange={(e) => setMeal({ ...meal, [k]: e.target.value })} placeholder={k === 'calories' ? 'Cal' : label[0] + ' (g)'} aria-label={label} />)}
+          <button className="btn" type="submit">Log meal</button>
+        </form>
+        {pick ? <div className="sub" style={{ fontSize: 13 }}>From your recipe <b>{pick.name}</b>. Change servings to scale it, or edit any number before logging.</div>
+          : meal.name.trim() && <label className="row" style={{ gap: 6, fontSize: 14 }}><input type="checkbox" checked={keep} onChange={(e) => setKeep(e.target.checked)} /> Also save this to Recipes</label>}
+      </section>
+
       <section className="card" aria-labelledby="body-h">
         <div className="row between">
           <h2 id="body-h">Body &amp; targets</h2>
@@ -163,21 +215,6 @@ export default function Health({ me }) {
         </div>
         {preview && <div className="note">Burns about <b>{preview.bmr}</b> cal at rest. Daily targets: <b>{preview.calories}</b> cal · protein <b>{preview.protein}g</b> · carbs <b>{preview.carbs}g</b> · fat <b>{preview.fat}g</b> · water <b>{preview.water}</b> glasses.{!stored.auto && ' Tick "Work out my targets" to use these.'}</div>}
         <div className="sub" style={{ fontSize: 12 }}>Uses the Mifflin-St Jeor formula. Protein comes from your weight, fat from the share you pick, carbs fill the rest. Targets update every time you log a new weight. These are estimates, so check with a doctor or dietitian for medical needs.</div>
-      </section>
-
-      <section className="card" aria-labelledby="meal-h">
-        <h2 id="meal-h">Meals</h2>
-        {todaysMeals.map((m) => (
-          <div key={m.id} className="task">
-            <div style={{ flex: 1 }}><b>{m.name}</b><div className="sub" style={{ fontSize: 13 }}>{m.calories} cal · P {m.protein}g · C {m.carbs}g · F {m.fat}g</div></div>
-            <button type="button" className="btn ghost small" aria-label={'Remove ' + m.name} onClick={() => remove(m.id)}>✕</button>
-          </div>
-        ))}
-        <form className="row" onSubmit={addMeal}>
-          <input className="field" style={{ flex: '3 1 180px' }} value={meal.name} onChange={(e) => setMeal({ ...meal, name: e.target.value })} placeholder="What did you eat?" aria-label="Meal" />
-          {MACROS.map(([k, label]) => <input key={k} className="field" type="number" inputMode="decimal" style={{ flex: '1 1 80px' }} value={meal[k]} onChange={(e) => setMeal({ ...meal, [k]: e.target.value })} placeholder={k === 'calories' ? 'Cal' : label[0] + ' (g)'} aria-label={label} />)}
-          <button className="btn" type="submit">Log meal</button>
-        </form>
       </section>
 
       <div className="grid">

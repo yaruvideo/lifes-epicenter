@@ -10,6 +10,7 @@ import Appearance from './screens/Appearance.jsx';
 import Settings from './screens/Settings.jsx';
 import Soon from './screens/Soon.jsx';
 import Health from './screens/Health.jsx';
+import Recipes from './screens/Recipes.jsx';
 import Calendar from './screens/Calendar.jsx';
 import Shared from './screens/Shared.jsx';
 import Library from './screens/Library.jsx';
@@ -21,7 +22,7 @@ import { device } from './db.js';
 
 const MAIN = [
   ['today', 'Today'], ['journal', 'Journal'], ['tasks', 'Tasks'],
-  ['calendar', 'Calendar'], ['health', 'Health & macros'], ['shared', 'Shared with Hannah']
+  ['calendar', 'Calendar'], ['health', 'Health & macros'], ['recipes', 'Recipes'], ['shared', 'Shared with Hannah']
 ];
 const LIBRARY = [['games', 'Games'], ['books', 'Books & manga'], ['shows', 'Shows & movies']];
 const SECTIONS = [['gamedev', 'Game Dev', '#FF9F45'], ['video', 'Video Projects', '#F2545B'], ['client', 'Client Work', '#7FA8F5']];
@@ -55,6 +56,7 @@ export default function App() {
   else if (page === 'tasks') screen = <Tasks me={me} />;
   else if (page === 'journal') screen = <Journal me={me} />;
   else if (page === 'health') screen = <Health me={me} />;
+  else if (page === 'recipes') screen = <Recipes me={me} />;
   else if (page === 'calendar') screen = <Calendar me={me} />;
   else if (page === 'shared') screen = <Shared me={me} />;
   else if (page === 'gamedev') screen = <GameDev me={me} />;
