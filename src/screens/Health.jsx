@@ -58,6 +58,13 @@ export default function Health({ me }) {
   };
   const todaysMeals = meals.filter((m) => m.person === who && m.date === today).sort((a, b) => a.at - b.at);
   const tot = totals(todaysMeals);
+  const [sortBy, setSortBy] = useState([null, 0]);
+  // Numbers sort highest first on the first click; names A to Z. Third click goes back to time order.
+  const sortMeals = (k) => {
+    const first = k === 'name' ? 1 : -1;
+    setSortBy(sortBy[0] !== k ? [k, first] : sortBy[1] === first ? [k, -first] : [null, 0]);
+  };
+  const sortedMeals = !sortBy[0] ? todaysMeals : [...todaysMeals].sort((a, b) => sortBy[1] * (sortBy[0] === 'name' ? a.name.localeCompare(b.name) : (a[sortBy[0]] || 0) - (b[sortBy[0]] || 0)));
   const water = waters.find((w) => w.id === 'water-' + who + '-' + today)?.count || 0;
   const todaysEx = exercise.filter((e) => e.person === who && e.date === today);
 
@@ -165,12 +172,31 @@ export default function Health({ me }) {
 
       <section className="card" aria-labelledby="meal-h">
         <h2 id="meal-h">Meals</h2>
-        {todaysMeals.map((m) => (
-          <div key={m.id} className="task">
-            <div style={{ flex: 1 }}><b>{m.name}</b><div className="sub" style={{ fontSize: 13 }}>{m.calories} cal · P {m.protein}g · C {m.carbs}g · F {m.fat}g</div></div>
-            <button type="button" className="btn ghost small" aria-label={'Remove ' + m.name} onClick={() => remove(m.id)}>✕</button>
+        {todaysMeals.length > 0 && (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="tbl">
+              <thead><tr>
+                {[['name', 'Food'], ...MACROS.map(([k, l, u]) => [k, l + (u ? ' (' + u + ')' : '')])].map(([k, l]) => (
+                  <th key={k} aria-sort={sortBy[0] === k ? (sortBy[1] > 0 ? 'ascending' : 'descending') : 'none'} style={{ textAlign: k === 'name' ? 'left' : 'right' }}>
+                    <button type="button" onClick={() => sortMeals(k)}>{l}{sortBy[0] === k ? (sortBy[1] > 0 ? ' ▲' : ' ▼') : ''}</button>
+                  </th>
+                ))}
+                <th><span className="sr-only">Remove</span></th>
+              </tr></thead>
+              <tbody>
+                {sortedMeals.map((m) => (
+                  <tr key={m.id}>
+                    <td><b>{m.name}</b>{m.servings && m.servings !== 1 ? <span className="sub"> · {m.servings} servings</span> : null}</td>
+                    {MACROS.map(([k]) => <td key={k} className="n">{Math.round((m[k] || 0) * 10) / 10}</td>)}
+                    <td className="n"><button type="button" className="btn ghost small" aria-label={'Remove ' + m.name} onClick={() => remove(m.id)}>✕</button></td>
+                  </tr>
+                ))}
+              </tbody>
+              {todaysMeals.length > 1 && <tfoot><tr><td>Total</td>{MACROS.map(([k]) => <td key={k} className="n">{Math.round(tot[k] * 10) / 10}</td>)}<td /></tr></tfoot>}
+            </table>
+            <div className="sub" style={{ fontSize: 12, marginTop: 6 }}>Click a column to sort. Click again to flip it{sortBy[0] ? ', or a third time to go back to the order you ate' : ''}.</div>
           </div>
-        ))}
+        )}
         <form className="row" onSubmit={addMeal}>
           <div style={{ flex: '3 1 180px', position: 'relative' }}>
             <input className="field" style={{ width: '100%' }} value={meal.name} onChange={(e) => { setMeal({ ...meal, name: e.target.value }); setPick(null); setMenu(true); setHl(0); }} onKeyDown={mealKey} onFocus={() => setMenu(true)} onBlur={() => setTimeout(() => setMenu(false), 150)} placeholder={recipes.length ? 'Meal or recipe…' : 'What did you eat?'} aria-label="Meal" role="combobox" aria-expanded={showMenu} aria-controls="recipe-menu" aria-autocomplete="list" />

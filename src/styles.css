@@ -70,6 +70,15 @@ label.lbl { display: flex; flex-direction: column; gap: 6px; font-size: 13px; co
 .err { color: #FF8A8A; }
 
 .mobilebar { display: none; }
+.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
+.tbl th, .tbl td { padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: left; }
+.tbl th button { background: none; border: 0; padding: 0; cursor: pointer; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.tbl th[aria-sort=ascending] button, .tbl th[aria-sort=descending] button { color: var(--hi); }
+.tbl td.n, .tbl th:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
+.tbl tbody tr:hover { background: var(--inner); }
+.tbl tfoot td { font-weight: 700; border-bottom: 0; }
+.linkish { background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 @media (max-width: 760px) {
   .side { display: none; }
   main { padding: 20px 16px 96px; }

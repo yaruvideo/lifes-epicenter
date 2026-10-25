@@ -13,9 +13,13 @@ export default function Recipes({ me }) {
   const [q, setQ] = useState('');
   const [open, setOpen] = useState(null);
   const s = q.trim().toLowerCase();
+  const [sortBy, setSortBy] = useState(['name', 1]);
+  // Numbers sort highest first on the first click; names A to Z.
+  const sortOn = (k) => setSortBy(sortBy[0] === k ? [k, -sortBy[1]] : [k, k === 'name' ? 1 : -1]);
+  const [sk, dir] = sortBy;
   const list = recipes
     .filter((r) => !s || [r.name, r.tags, r.ingredients].some((t) => (t || '').toLowerCase().includes(s)))
-    .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    .sort((a, b) => dir * (sk === 'name' ? (a.name || '').localeCompare(b.name || '') : (a[sk] || 0) - (b[sk] || 0)) || (a.name || '').localeCompare(b.name || ''));
 
   return (
     <>
@@ -28,14 +32,26 @@ export default function Recipes({ me }) {
         {recipes.length === 0 ? <div className="empty">No recipes yet. Add one and it will show up when you type a meal on Health.</div>
           : list.length === 0 ? <div className="empty">Nothing matches "{q}".</div>
           : (
-            <div className="themes" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' }}>
-              {list.map((r) => (
-                <button key={r.id} type="button" className="theme" onClick={() => setOpen(r)}>
-                  <b>{r.name}</b>
-                  <span className="sub" style={{ fontSize: 13 }}>{macroLine(r)} per serving</span>
-                  <span className="sub" style={{ fontSize: 12 }}>{[r.servings > 1 && 'Makes ' + r.servings, r.tags].filter(Boolean).join(' · ')}</span>
-                </button>
-              ))}
+            <div style={{ overflowX: 'auto' }}>
+              <table className="tbl">
+                <thead><tr>
+                  {[['name', 'Recipe'], ...MACROS.map(([k, l, u]) => [k, l + (u ? ' (' + u + ')' : '')]), ['servings', 'Makes']].map(([k, l]) => (
+                    <th key={k} aria-sort={sortBy[0] === k ? (sortBy[1] > 0 ? 'ascending' : 'descending') : 'none'}>
+                      <button type="button" onClick={() => sortOn(k)}>{l}{sortBy[0] === k ? (sortBy[1] > 0 ? ' ▲' : ' ▼') : ''}</button>
+                    </th>
+                  ))}
+                </tr></thead>
+                <tbody>
+                  {list.map((r) => (
+                    <tr key={r.id} onClick={() => setOpen(r)} style={{ cursor: 'pointer' }}>
+                      <td><button type="button" className="linkish" onClick={(e) => { e.stopPropagation(); setOpen(r); }}><b>{r.name}</b></button>{r.tags ? <div className="sub" style={{ fontSize: 12 }}>{r.tags}</div> : null}</td>
+                      {MACROS.map(([k]) => <td key={k} className="n">{r1(r[k] || 0)}</td>)}
+                      <td className="n">{r.servings || 1}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="sub" style={{ fontSize: 12, marginTop: 6 }}>Macros are per serving. Click a column to sort, click again to flip it. Click a recipe to open it.</div>
             </div>
           )}
       </section>
