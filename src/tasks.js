@@ -3,9 +3,7 @@ import { todayStr } from './store.js';
 
 export const LISTS = [['inbox', 'Inbox'], ['health', 'Health'], ['client', 'Client Work'], ['video', 'Video Projects'], ['gamedev', 'Game Dev'], ['home', 'Home']];
 export const listName = (id) => (LISTS.find((l) => l[0] === id) || [id, id])[1];
-// Lists that ask "what got done?" when a task is finished. The note goes to the Journal.
-export const WRAP_UP_LISTS = ['client', 'video', 'gamedev'];
-export const needsWrapUp = (t) => WRAP_UP_LISTS.includes(t.list) || t.owner === 'both';
+// Every task asks "what got done?" when it's ticked. The note (optional) goes to the Journal.
 
 export const PRIORITY = { High: { background: 'var(--warm)', color: 'var(--on-accent)' }, Medium: { background: 'var(--inner)', color: 'var(--warm)', border: '1px solid var(--warm)' }, Low: { background: 'var(--inner)', color: 'var(--muted)', border: '1px solid var(--border)' } };
 

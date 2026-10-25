@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { completeTask, needsWrapUp, undoTask } from '../tasks.js';
+import { completeTask, undoTask } from '../tasks.js';
 import TaskModal from './TaskModal.jsx';
 import WrapUp from './WrapUp.jsx';
 
@@ -9,8 +9,7 @@ export default function useTaskActions(me) {
   const [open, setOpen] = useState(null);
   const onCheck = (t) => {
     if (t.done) undoTask(t);
-    else if (needsWrapUp(t)) setWrap(t);
-    else completeTask(t, me);
+    else setWrap(t);
   };
   const overlays = (
     <>
