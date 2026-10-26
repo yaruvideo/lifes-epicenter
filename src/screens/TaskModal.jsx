@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { newId, patch, remove, save } from '../db.js';
-import { useItems } from '../store.js';
-import { LISTS } from '../tasks.js';
+import { useItems, todayStr } from '../store.js';
+import { LISTS, weekEnd } from '../tasks.js';
 import { PEOPLE } from '../config.js';
 import { other } from '../store.js';
 
@@ -68,6 +68,10 @@ export default function TaskModal({ task, me, onClose }) {
           <label className="lbl" style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 22 }}>
             <input type="checkbox" checked={!!t.myDay} onChange={(e) => set({ myDay: e.target.checked })} style={{ width: 20, height: 20, accentColor: 'var(--accent)' }} />
             Show on Today
+          </label>
+          <label className="lbl" style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 22 }}>
+            <input type="checkbox" checked={!!t.thisWeek && t.thisWeek >= todayStr()} onChange={(e) => set({ thisWeek: e.target.checked ? weekEnd() : null })} style={{ width: 20, height: 20, accentColor: 'var(--accent)' }} />
+            Show in This Week
           </label>
         </div>
         <label className="lbl">Notes

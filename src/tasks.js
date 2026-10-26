@@ -34,3 +34,11 @@ export const undoTask = (t) => patch(t.id, { done: false, doneAt: null, doneBy: 
 // A task waiting on another unfinished task stays off Today until that one is done.
 export const isBlocked = (t, all) => !!t.waitingOn && all.some((x) => x.id === t.waitingOn && !x.done);
 export const isToday = (t, all = []) => !t.done && !isBlocked(t, all) && (t.myDay || (t.due && t.due <= todayStr()));
+
+// "This Week" runs Monday to Sunday. Ticking "Show in This Week" stores that Sunday, so the flag clears itself next week.
+export const weekEnd = () => {
+  const d = new Date();
+  d.setDate(d.getDate() + ((7 - d.getDay()) % 7));
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+};
+export const isThisWeek = (t) => !!(t.myDay || (t.due && t.due <= weekEnd()) || (t.thisWeek && t.thisWeek >= todayStr()));

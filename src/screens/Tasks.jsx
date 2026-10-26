@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { save } from '../db.js';
 import { useItems, other, todayStr } from '../store.js';
-import { LISTS, isToday } from '../tasks.js';
+import { LISTS, isToday, isThisWeek, isBlocked, weekEnd } from '../tasks.js';
 import { PEOPLE } from '../config.js';
 import TaskRow from './TaskRow.jsx';
 import QuickAdd from './QuickAdd.jsx';
@@ -15,6 +15,7 @@ export default function Tasks({ me }) {
   const filters = [
     ['all', 'All', () => true],
     ['myday', 'My Day', (t) => (t.done ? t.myDay || (t.due && t.due <= todayStr()) : isToday(t, tasks))],
+    ['week', 'This Week', (t) => isThisWeek(t) && (t.done || !isBlocked(t, tasks))],
     ['mine', 'Mine', (t) => t.owner === me],
     ['theirs', PEOPLE[other(me)].name, (t) => t.owner === other(me)],
     ['both', 'Together', (t) => t.owner === 'both'],
@@ -25,7 +26,13 @@ export default function Tasks({ me }) {
   const prefs = useItems('prefs').find((p) => p.id === 'prefs-' + me) || {};
   const [arranging, setArranging] = useState(false);
   const order = prefs.listOrder || [];
-  const pos = (id) => { const i = order.indexOf(id); return i < 0 ? 999 + filters.findIndex((f) => f[0] === id) : i; };
+  // A list added after you arranged yours slots in right after the list it follows by default.
+  const pos = (id) => {
+    const i = order.indexOf(id);
+    if (i >= 0) return i;
+    const k = filters.findIndex((f) => f[0] === id);
+    return order.length && k > 0 ? pos(filters[k - 1][0]) + 0.5 : 999 + k;
+  };
   const ordered = [...filters].sort((a, b) => pos(a[0]) - pos(b[0]));
   const moveList = (id, dir) => {
     const ids = ordered.map((f) => f[0]);
@@ -42,7 +49,7 @@ export default function Tasks({ me }) {
   const weekAgo = Date.now() - 7 * 864e5;
   const recent = filter === 'done' ? [] : tasks.filter((t) => t.done && (t.doneAt || 0) > weekAgo && test(t)).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
   const showDone = prefs.showCompleted !== false;
-  const listExtra = LISTS.some((l) => l[0] === filter) ? { list: filter } : {};
+  const listExtra = LISTS.some((l) => l[0] === filter) ? { list: filter } : filter === 'week' ? { thisWeek: weekEnd() } : filter === 'myday' ? { myDay: true } : {};
 
   return (
     <>
