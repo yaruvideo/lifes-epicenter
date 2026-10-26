@@ -28,7 +28,7 @@ export default function Journal({ me }) {
         <textarea className="field" value={text} onChange={(e) => setText(e.target.value)} placeholder="What's on your mind?" aria-label="New journal entry" />
         <div className="row between">
           <div className="seg" role="group" aria-label="Show">
-            {[['all', 'Everything'], ['thought', 'Thoughts'], ['task', 'Tasks done'], ['media', 'Media notes'], ['health', 'Health']].map(([id, l]) => <button key={id} type="button" aria-pressed={kind === id} onClick={() => setKind(id)}>{l}</button>)}
+            {[['all', 'Everything'], ['thought', 'Thoughts'], ['prompt', 'Morning prompts'], ['task', 'Tasks done'], ['media', 'Media notes'], ['health', 'Health']].map(([id, l]) => <button key={id} type="button" aria-pressed={kind === id} onClick={() => setKind(id)}>{l}</button>)}
           </div>
           <button className="btn" type="submit">Save</button>
         </div>
@@ -45,6 +45,8 @@ export default function Journal({ me }) {
                   ? <><span className="chip" style={{ background: 'var(--warm)', color: 'var(--on-accent)' }}>{x.label || 'Note'}</span> <b>{x.title}</b>{x.text && <div style={{ marginTop: 6, whiteSpace: 'pre-wrap' }}>{x.text}</div>}</>
                   : x.type === 'health'
                   ? <><span className="chip" style={{ background: 'var(--accent)', color: 'var(--on-accent)' }}>Exercise</span> {x.text}</>
+                  : x.type === 'prompt'
+                  ? <><span className="chip" style={{ background: 'var(--accent)', color: 'var(--on-accent)' }}>Morning prompt</span> <b>{x.prompt}</b><div style={{ marginTop: 6, whiteSpace: 'pre-wrap' }}>{x.text}</div></>
                   : x.type === 'task'
                   ? <><span className="chip" style={{ background: 'var(--hi)', color: 'var(--on-accent)' }}>Task done</span> <b>{x.title}</b> <span className="sub">· {listName(x.list)}</span>{x.text && <div style={{ marginTop: 6 }}>{x.text}</div>}</>
                   : <div style={{ whiteSpace: 'pre-wrap' }}>{x.text}</div>}

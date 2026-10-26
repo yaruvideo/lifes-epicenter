@@ -7,6 +7,8 @@ import QuickAdd from './QuickAdd.jsx';
 import useTaskActions from './useTaskActions.jsx';
 import { todayStr } from '../store.js';
 import { goalsFor, logMed, medLogId, totals } from '../health.js';
+import { save } from '../db.js';
+import { promptFor } from '../prompts.js';
 
 export default function Today({ me }) {
   const tasks = useItems('task');
@@ -18,6 +20,9 @@ export default function Today({ me }) {
   const claudeNotes = useItems('claudenote');
   const events = useItems('event');
   const [who, setWho] = useState('both');
+  const journal = useItems('journal');
+  const [skip, setSkip] = useState(0);
+  const [answer, setAnswer] = useState('');
   const { onCheck, onOpen, overlays } = useTaskActions(me);
   const hour = new Date().getHours();
   const hello = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
@@ -42,6 +47,33 @@ export default function Today({ me }) {
         </div>
       </header>
       <QuickAdd me={me} extra={{ myDay: true }} placeholder="What needs doing today?" />
+      {(() => {
+        // Morning journal prompt: Claude's morning note can set the question (field "prompt"); otherwise one from the list.
+        const day = todayStr();
+        const done = journal.find((x) => x.type === 'prompt' && x.by === me && x.day === day);
+        const fromClaude = claudeNotes.find((n) => n.prompt && (!n.for || n.for === me) && n.at >= start);
+        const q = done ? done.prompt : skip === 0 && fromClaude ? fromClaude.prompt : promptFor(day, skip);
+        const submit = (e) => {
+          e.preventDefault();
+          if (!answer.trim()) return;
+          save('journal', { type: 'prompt', prompt: q, text: answer.trim(), day, by: me, at: Date.now() });
+          setAnswer('');
+        };
+        return done ? (
+          <section className="card row" aria-label="Morning journal" style={{ gap: 10 }}>
+            <span className="chip" style={{ background: 'var(--hi)', color: 'var(--on-accent)' }}>✓ Journaled</span>
+            <span className="sub" style={{ flex: 1, minWidth: 0 }}>{q}</span>
+            <a href="#/journal" className="sub">Journal →</a>
+          </section>
+        ) : (
+          <form className="card" aria-labelledby="prompt-h" onSubmit={submit} style={{ borderColor: 'var(--accent)' }}>
+            <div className="row between"><h2 id="prompt-h">Morning journal</h2><button type="button" className="btn ghost small" onClick={() => setSkip(skip + 1)}>Another question</button></div>
+            <div style={{ fontSize: 18, fontWeight: 600 }}>{q}</div>
+            <textarea className="field" value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder="Write as much or as little as you like" aria-label={q} />
+            <div className="row" style={{ justifyContent: 'flex-end' }}><button className="btn" type="submit">Save to Journal</button></div>
+          </form>
+        );
+      })()}
       <div className="grid">
         <section className="card" aria-labelledby="today-h">
           <div className="row between"><h2 id="today-h">Today's tasks</h2><a href="#/tasks" className="sub">All tasks →</a></div>
