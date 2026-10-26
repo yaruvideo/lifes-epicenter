@@ -80,8 +80,8 @@ export default function Today({ me }) {
               <div key={m.id} className="task">
                 <span className="dot" style={{ background: PEOPLE[m.person]?.color, borderRadius: '50%' }} />
                 <div style={{ flex: 1 }}><b>{m.name}</b><div className="sub" style={{ fontSize: 13 }}>{(m.person === me ? 'Me' : PEOPLE[m.person]?.name) + (m.time ? ' · ' + m.time : '')}</div></div>
-                <button type="button" className="btn small" onClick={() => logMed(m, 'taken', me)}>Taken</button>
                 {m.canSkip && <button type="button" className="btn ghost small" onClick={() => logMed(m, 'skipped', me)}>Skip</button>}
+                <button type="button" className="btn small" onClick={() => logMed(m, 'taken', me)}>Taken</button>
               </div>
             ));
           })()}

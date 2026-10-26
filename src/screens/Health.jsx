@@ -122,8 +122,8 @@ export default function Health({ me }) {
           : due.map((m) => (
             <div key={m.id} className="task">
               <div style={{ flex: 1 }}><b>{m.name}</b><div className="sub" style={{ fontSize: 13 }}>{[m.schedule, m.time && 'at ' + m.time].filter(Boolean).join(' · ')}</div></div>
-              <button type="button" className="btn small" onClick={() => logMed(m, 'taken', me)}>Taken</button>
               {m.canSkip && <button type="button" className="btn ghost small" onClick={() => logMed(m, 'skipped', me)}>Skip today</button>}
+              <button type="button" className="btn small" onClick={() => logMed(m, 'taken', me)}>Taken</button>
             </div>
           )))}
         {!editMeds && handled.length > 0 && (
