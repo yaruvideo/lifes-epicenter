@@ -70,6 +70,12 @@ function Details({ v, me }) {
   );
 }
 
+// Share of the whole project's checklist ticked off, across every step.
+const progress = (v) => {
+  const all = Object.values(v.checklist || {}).flat();
+  return all.length ? all.filter((c) => c.done).length / all.length : 0;
+};
+
 function Strip({ v, onStage }) {
   const i = STAGES.indexOf(v.stage);
   return (
@@ -86,7 +92,22 @@ export default function Video({ me }) {
   const [selId, setSelId] = useState(null);
   const [picker, setPicker] = useState(false);
   const [showDone, setShowDone] = useState(false);
-  const active = videos.filter((v) => !v.done && !v.parked).sort((a, b) => (a.publishDate || '9999').localeCompare(b.publishDate || '9999') || (b.created || 0) - (a.created || 0));
+  const prefs = useItems('prefs').find((p) => p.id === 'prefs-' + me) || {};
+  const sortBy = (prefs.sortBy || {}).videos || 'date';
+  const setSort = (v) => save('prefs', { ...prefs, sortBy: { ...(prefs.sortBy || {}), videos: v } }, 'prefs-' + me);
+  const byDate = (a, b) => (a.publishDate || '9999').localeCompare(b.publishDate || '9999') || (b.created || 0) - (a.created || 0);
+  const sorters = {
+    date: byDate,
+    stage: (a, b) => STAGES.indexOf(b.stage) - STAGES.indexOf(a.stage) || byDate(a, b),
+    stageUp: (a, b) => STAGES.indexOf(a.stage) - STAGES.indexOf(b.stage) || byDate(a, b),
+    mine: (a, b) => sortKeyOf(a) - sortKeyOf(b),
+    series: (a, b) => (a.series || '~').localeCompare(b.series || '~') || byDate(a, b),
+    progress: (a, b) => progress(b) - progress(a) || byDate(a, b),
+    alpha: (a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base', numeric: true }),
+    newest: (a, b) => (b.created || 0) - (a.created || 0)
+  };
+  const active = videos.filter((v) => !v.done && !v.parked).sort(sorters[sortBy] || byDate);
+  const activeDrag = useDragSort(active, sortBy === 'mine');
   // On hold: videos moved to the Inbox, in your own drag-and-drop order.
   const parked = videos.filter((v) => !v.done && v.parked).sort((a, b) => sortKeyOf(a) - sortKeyOf(b));
   const { handle, dragClass } = useDragSort(parked);
@@ -101,7 +122,8 @@ export default function Video({ me }) {
     const l = v.checklist?.[v.stage] || [];
     const meta = [v.series || (TEMPLATES[v.template] || TEMPLATES.long).name, v.done ? 'Published ' + new Date(v.publishedAt || Date.now()).toLocaleDateString([], { month: 'short', day: 'numeric' }) : v.publishDate ? 'Publish ' + new Date(v.publishDate + 'T12:00').toLocaleDateString([], { month: 'short', day: 'numeric' }) : 'No date', !v.done && l.length ? l.filter((c) => c.done).length + '/' + l.length + ' done' : ''].filter(Boolean).join(' · ');
     return (
-      <div key={v.id} role="button" tabIndex={0} className={'vrow' + (sel && v.id === sel.id ? ' on' : '')} onClick={() => setSelId(v.id)} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setSelId(v.id))} aria-pressed={sel && v.id === sel.id}>
+      <div key={v.id} data-drag-id={v.id} role="button" tabIndex={0} className={'vrow' + (sel && v.id === sel.id ? ' on' : '') + (v.done || v.parked ? '' : activeDrag.dragClass(v))} onClick={() => setSelId(v.id)} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setSelId(v.id))} aria-pressed={sel && v.id === sel.id}>
+        {!v.done && activeDrag.handle(v)}
         <span style={{ flex: '1 1 220px', minWidth: 0 }}><b style={{ display: 'block' }}>{v.title}</b><span className="sub" style={{ fontSize: 12 }}>{meta}</span></span>
         <Strip v={v} onStage={v.done ? null : (s) => { setSelId(v.id); save('video', { ...v, stage: s }, v.id); }} />
       </div>
@@ -114,6 +136,20 @@ export default function Video({ me }) {
         <button type="button" className="btn vid" onClick={() => setPicker(true)}>+ New video from template</button>
       </header>
       <section aria-label="Projects" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {active.length > 1 && (
+          <label className="row sub" style={{ gap: 8, fontSize: 14, alignSelf: 'flex-end' }}>Sort by
+            <select className="field" style={{ width: 'auto', minHeight: 36 }} value={sortBy} onChange={(e) => setSort(e.target.value)}>
+              <option value="date">Publish date (soonest first)</option>
+              <option value="stage">Current step (furthest along first)</option>
+              <option value="stageUp">Current step (just started first)</option>
+              <option value="mine">My order (drag)</option>
+              <option value="progress">Checklist progress (most done first)</option>
+              <option value="series">Series</option>
+              <option value="alpha">A to Z</option>
+              <option value="newest">Newest first</option>
+            </select>
+          </label>
+        )}
         {active.length === 0 && <div className="empty">No videos in progress. Start one from a template.</div>}
         {active.map(row)}
         {done.length > 0 && <button type="button" className="btn ghost small" style={{ alignSelf: 'flex-start' }} onClick={() => setShowDone(!showDone)}>{showDone ? 'Hide' : 'Show'} published ({done.length})</button>}
