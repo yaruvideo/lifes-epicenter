@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { newId, patch, remove, save } from '../db.js';
 import { useItems, todayStr } from '../store.js';
-import { useLists, weekEnd, updateSub } from '../tasks.js';
+import { PRIORITY_ORDER, useLists, weekEnd, updateSub } from '../tasks.js';
 import SubtaskItem from './SubtaskItem.jsx';
 import { PEOPLE } from '../config.js';
 import { other } from '../store.js';
@@ -53,7 +53,7 @@ export default function TaskModal({ task, me, onClose, onCheck }) {
           </label>
           <label className="lbl">Priority
             <select className="field" value={t.priority || ''} onChange={(e) => set({ priority: e.target.value || null })}>
-              <option value="">None</option><option>High</option><option>Medium</option><option>Low</option>
+              <option value="">None</option>{PRIORITY_ORDER.map((p) => <option key={p}>{p}</option>)}
             </select>
           </label>
           <label className="lbl">Repeats

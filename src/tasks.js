@@ -17,7 +17,16 @@ export const saveLists = (lists) => save('tasklists', { lists }, 'tasklists');
 export const listName = (id, lists = LISTS) => (lists.find((l) => l[0] === id) || [id, id])[1];
 // Every task asks "what got done?" when it's ticked. The note (optional) goes to the Journal.
 
-export const PRIORITY = { High: { background: 'var(--warm)', color: 'var(--on-accent)' }, Medium: { background: 'var(--inner)', color: 'var(--warm)', border: '1px solid var(--warm)' }, Low: { background: 'var(--inner)', color: 'var(--muted)', border: '1px solid var(--border)' } };
+export const PRIORITY = {
+  Urgent: { background: '#F2545B', color: '#fff' },
+  High: { background: 'var(--warm)', color: 'var(--on-accent)' },
+  Medium: { background: 'var(--inner)', color: 'var(--warm)', border: '1px solid var(--warm)' },
+  Low: { background: 'var(--inner)', color: 'var(--muted)', border: '1px solid var(--border)' },
+  'Long-Term': { background: 'var(--inner)', color: 'var(--accent)', border: '1px dashed var(--accent)' }
+};
+// Highest first. Tasks with no priority sort between Low and Long-Term.
+export const PRIORITY_ORDER = ['Urgent', 'High', 'Medium', 'Low', 'Long-Term'];
+export const priorityRank = (p) => ({ Urgent: 0, High: 1, Medium: 2, Low: 3, 'Long-Term': 5 })[p] ?? 4;
 
 export function addTask(title, me, extra = {}) {
   return save('task', { title: title.trim(), owner: me, list: 'inbox', due: null, priority: null, repeat: null, notes: '', subtasks: [], done: false, myDay: false, created: Date.now(), ...extra });

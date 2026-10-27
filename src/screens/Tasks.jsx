@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { patch, save } from '../db.js';
 import { useItems, other, todayStr } from '../store.js';
-import { useLists, saveLists, newListId, isToday, isThisWeek, isBlocked, weekEnd } from '../tasks.js';
+import { priorityRank, useLists, saveLists, newListId, isToday, isThisWeek, isBlocked, weekEnd } from '../tasks.js';
 import { PEOPLE } from '../config.js';
 import TaskRow from './TaskRow.jsx';
 import QuickAdd from './QuickAdd.jsx';
@@ -69,15 +69,14 @@ export default function Tasks({ me }) {
     save('prefs', { ...prefs, listOrder: ids }, 'prefs-' + me);
   };
   const [, , test] = filters.find((f) => f[0] === filter) || filters[0];
-  const rank = { High: 0, Medium: 1, Low: 2 };
   // Each list remembers how you sort it. "My order" is drag and drop; the order is saved on the tasks, so it syncs.
   const sortBy = filter === 'done' ? 'recent' : (prefs.sortBy || {})[filter] || 'priority';
   const setSort = (v) => save('prefs', { ...prefs, sortBy: { ...(prefs.sortBy || {}), [filter]: v } }, 'prefs-' + me);
   const key = (t) => t.sortKey ?? t.created ?? 0;
   const byDue = (a, b) => (a.due || '9').localeCompare(b.due || '9');
   const sorters = {
-    priority: (a, b) => (rank[a.priority] ?? 3) - (rank[b.priority] ?? 3) || byDue(a, b),
-    due: (a, b) => byDue(a, b) || (rank[a.priority] ?? 3) - (rank[b.priority] ?? 3),
+    priority: (a, b) => priorityRank(a.priority) - priorityRank(b.priority) || byDue(a, b),
+    due: (a, b) => byDue(a, b) || priorityRank(a.priority) - priorityRank(b.priority),
     alpha: (a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base', numeric: true }),
     mine: (a, b) => key(a) - key(b),
     recent: (a, b) => (b.doneAt || 0) - (a.doneAt || 0)
