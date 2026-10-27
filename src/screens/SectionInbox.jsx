@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { patch, save } from '../db.js';
+import { save } from '../db.js';
+import useDragSort, { sortKeyOf } from './useDragSort.jsx';
 import { useItems } from '../store.js';
 import { isWaiting, priorityRank } from '../tasks.js';
 import TaskRow from './TaskRow.jsx';
@@ -8,14 +9,14 @@ import useTaskActions from './useTaskActions.jsx';
 
 // The loose to-dos for a section (Video Projects, Client Work): the open tasks in that task list,
 // shown under the section's own pages. Same tasks as on the Tasks page, so ticking one here ticks it there.
-export default function SectionInbox({ me, listId, title = 'Inbox' }) {
+export default function SectionInbox({ me, listId, title = 'To-dos' }) {
   const tasks = useItems('task');
   const prefs = useItems('prefs').find((p) => p.id === 'prefs-' + me) || {};
   const { onCheck, onOpen, overlays } = useTaskActions(me);
   const prefKey = 'section-' + listId;
   const sortBy = (prefs.sortBy || {})[prefKey] || 'mine';
   const setSort = (v) => save('prefs', { ...prefs, sortBy: { ...(prefs.sortBy || {}), [prefKey]: v } }, 'prefs-' + me);
-  const key = (t) => t.sortKey ?? t.created ?? 0;
+  const key = sortKeyOf;
   const byDue = (a, b) => (a.due || '9').localeCompare(b.due || '9');
   const sorters = {
     mine: (a, b) => key(a) - key(b),
@@ -28,23 +29,8 @@ export default function SectionInbox({ me, listId, title = 'Inbox' }) {
   const recent = tasks.filter((t) => t.list === listId && t.done && (t.doneAt || 0) > weekAgo).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
   const [showDone, setShowDone] = useState(false);
 
-  const [drag, setDrag] = useState(null);
-  const drop = () => {
-    if (drag && drag.over !== drag.id) {
-      const rest = shown.filter((t) => t.id !== drag.id);
-      const at = rest.findIndex((t) => t.id === drag.over) + (shown.findIndex((t) => t.id === drag.over) > shown.findIndex((t) => t.id === drag.id) ? 1 : 0);
-      const before = rest[at - 1], after = rest[at];
-      patch(drag.id, { sortKey: before && after ? (key(before) + key(after)) / 2 : before ? key(before) + 1000 : key(after) - 1000 });
-    }
-    setDrag(null);
-  };
-  const handle = (t) => sortBy === 'mine' && (
-    <span className="draghandle" aria-hidden="true" title="Drag to reorder"
-      onPointerDown={(e) => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); setDrag({ id: t.id, over: t.id }); }}
-      onPointerMove={(e) => { if (!drag) return; const el = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-task-id]'); if (el && el.dataset.taskId !== drag.over) setDrag({ ...drag, over: el.dataset.taskId }); }}
-      onPointerUp={drop} onPointerCancel={() => setDrag(null)}>⋮⋮</span>
-  );
-  const dragClass = (t) => !drag ? '' : drag.id === t.id ? ' dragging' : drag.over === t.id ? (shown.findIndex((x) => x.id === t.id) > shown.findIndex((x) => x.id === drag.id) ? ' dropbelow' : ' dropabove') : '';
+  const { handle: dragHandle, dragClass } = useDragSort(shown, sortBy === 'mine');
+  const handle = dragHandle;
 
   return (
     <section className="card" aria-labelledby={'inbox-' + listId}>

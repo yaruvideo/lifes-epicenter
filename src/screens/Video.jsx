@@ -3,6 +3,7 @@ import { newId, patch, remove, save } from '../db.js';
 import { useItems } from '../store.js';
 import Live from './Live.jsx';
 import SectionInbox from './SectionInbox.jsx';
+import useDragSort, { sortKeyOf } from './useDragSort.jsx';
 
 const STAGES = ['Idea', 'Script', 'Record', 'Edit', 'Publish'];
 const TEMPLATES = {
@@ -28,7 +29,7 @@ function Details({ v, me }) {
     <section className="card" aria-label="Project details" style={{ gap: 18 }}>
       <div className="row between" style={{ alignItems: 'flex-start' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="sub" style={{ fontSize: 13 }}>{[v.series, t.name + ' template'].filter(Boolean).join(' · ')}</div>
+          <div className="sub" style={{ fontSize: 13 }}>{[v.parked && 'On hold (in Inbox)', v.series, t.name + ' template'].filter(Boolean).join(' · ')}</div>
           <Live className="field display" style={{ fontSize: 26, fontWeight: 600, background: 'transparent', border: 0, padding: 0, minHeight: 0 }} value={v.title} onSave={(val) => set({ title: val || 'Untitled video' })} aria-label="Video title" />
         </div>
         {!v.done ? <button type="button" className="btn vid" onClick={advance}>{i < STAGES.length - 1 ? 'Move to ' + STAGES[i + 1] + ' →' : 'Mark published ✓'}</button>
@@ -61,7 +62,10 @@ function Details({ v, me }) {
           </div>
         </div>
       </div>
-      <button type="button" className="btn ghost small" style={{ alignSelf: 'flex-start' }} onClick={() => { if (confirm('Delete this video project?')) remove(v.id); }}>Delete video</button>
+      <div className="row">
+        {!v.done && <button type="button" className="btn ghost small" onClick={() => patch(v.id, v.parked ? { parked: false } : { parked: true, sortKey: Date.now() })}>{v.parked ? '↑ Make active again' : '↓ Move to Inbox (on hold)'}</button>}
+        <button type="button" className="btn ghost small" onClick={() => { if (confirm('Delete this video project?')) remove(v.id); }}>Delete video</button>
+      </div>
     </section>
   );
 }
@@ -82,7 +86,10 @@ export default function Video({ me }) {
   const [selId, setSelId] = useState(null);
   const [picker, setPicker] = useState(false);
   const [showDone, setShowDone] = useState(false);
-  const active = videos.filter((v) => !v.done).sort((a, b) => (a.publishDate || '9999').localeCompare(b.publishDate || '9999') || (b.created || 0) - (a.created || 0));
+  const active = videos.filter((v) => !v.done && !v.parked).sort((a, b) => (a.publishDate || '9999').localeCompare(b.publishDate || '9999') || (b.created || 0) - (a.created || 0));
+  // On hold: videos moved to the Inbox, in your own drag-and-drop order.
+  const parked = videos.filter((v) => !v.done && v.parked).sort((a, b) => sortKeyOf(a) - sortKeyOf(b));
+  const { handle, dragClass } = useDragSort(parked);
   const done = videos.filter((v) => v.done).sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0));
   const sel = videos.find((v) => v.id === selId) || active[0];
   const create = (k) => {
@@ -113,6 +120,20 @@ export default function Video({ me }) {
         {showDone && done.map(row)}
       </section>
       {sel && <Details key={sel.id} v={sel} me={me} />}
+      <section className="card" aria-labelledby="vinbox-h">
+        <h2 id="vinbox-h">Inbox <span className="sub" style={{ fontSize: 14, fontWeight: 400 }}>on hold · {parked.length}</span></h2>
+        {parked.length === 0 && <div className="empty">Videos you put on hold or postpone land here. Use "Move to Inbox" under a video's details.</div>}
+        {parked.map((v) => (
+          <div key={v.id} data-drag-id={v.id} className={'task' + dragClass(v)} style={sel && v.id === sel.id ? { boxShadow: 'inset 3px 0 0 #F2545B' } : undefined}>
+            {handle(v)}
+            <button type="button" className="title" onClick={() => setSelId(v.id)}>
+              {v.title}
+              <span className="sub" style={{ display: 'block', fontSize: 12 }}>{[v.series || (TEMPLATES[v.template] || TEMPLATES.long).name, v.stage, v.publishDate && 'Publish ' + v.publishDate].filter(Boolean).join(' · ')}</span>
+            </button>
+            <button type="button" className="btn ghost small" onClick={() => { patch(v.id, { parked: false }); setSelId(v.id); }}>Make active</button>
+          </div>
+        ))}
+      </section>
       <SectionInbox me={me} listId="video" />
       {picker && (
         <div className="modal-back" onClick={(e) => e.target === e.currentTarget && setPicker(false)}>

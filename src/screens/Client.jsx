@@ -4,6 +4,7 @@ import { device } from '../db.js';
 import { useItems, todayStr } from '../store.js';
 import Live from './Live.jsx';
 import SectionInbox from './SectionInbox.jsx';
+import useDragSort, { sortKeyOf } from './useDragSort.jsx';
 
 const STAGES = ['Brief', 'In progress', 'Review', 'Revisions', 'Delivered'];
 const INVOICE = ['Draft', 'Sent', 'Paid'];
@@ -14,6 +15,10 @@ export default function Client({ me }) {
   const projects = useItems('cproject');
   const hours = useItems('hours');
   const invoices = useItems('invoice');
+  // Projects on hold sit in the Inbox (drag to order) and stay out of the pipeline.
+  const live = projects.filter((p) => !p.parked);
+  const parked = projects.filter((p) => p.parked).sort((a, b) => sortKeyOf(a) - sortKeyOf(b));
+  const { handle, dragClass } = useDragSort(parked);
   const [overview, setOverview] = useState(true);
   const [expanded, setExpanded] = useState(null);
   const [cid, setCid] = useState(null);
@@ -45,7 +50,7 @@ export default function Client({ me }) {
   const monthHours = cHours.filter((h) => h.date.startsWith(month)).reduce((s, h) => s + h.hours, 0);
   const cProjects = client ? projects.filter((p) => p.clientId === client.id) : [];
   const cInvoices = client ? invoices.filter((i) => i.clientId === client.id).sort((a, b) => b.at - a.at) : [];
-  const nextDeadline = cProjects.filter((p) => p.stage !== 'Delivered' && p.deadline).sort((a, b) => a.deadline.localeCompare(b.deadline))[0];
+  const nextDeadline = cProjects.filter((p) => !p.parked && p.stage !== 'Delivered' && p.deadline).sort((a, b) => a.deadline.localeCompare(b.deadline))[0];
 
   return (
     <>
@@ -61,8 +66,8 @@ export default function Client({ me }) {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(170px, 1fr))', gap: 10, minWidth: 900 }}>
               {STAGES.map((s, si) => (
                 <div key={s} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <div className="sub" style={{ fontWeight: 600 }}>{s} · {projects.filter((p) => p.stage === s).length}</div>
-                  {projects.filter((p) => p.stage === s).map((p) => (
+                  <div className="sub" style={{ fontWeight: 600 }}>{s} · {live.filter((p) => p.stage === s).length}</div>
+                  {live.filter((p) => p.stage === s).map((p) => (
                     <div key={p.id} className="note" style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
                       <button type="button" onClick={() => setExpanded(expanded === p.id ? null : p.id)} aria-expanded={expanded === p.id} style={{ textAlign: 'left', background: 'none', border: 0, padding: 0, cursor: 'pointer' }}>
                         <b>{p.title}</b><span className="sub" style={{ display: 'block', fontSize: 12 }}>{nameOf(p.clientId)}{p.deadline ? ' · due ' + p.deadline : ''}</span>
@@ -76,6 +81,7 @@ export default function Client({ me }) {
                           <label className="lbl">Deadline<input type="date" className="field" style={{ minHeight: 36 }} value={p.deadline || ''} onChange={(e) => patch(p.id, { deadline: e.target.value || null })} /></label>
                           <div className="row" style={{ gap: 6 }}>
                             {si < STAGES.length - 1 && <button type="button" className="btn small" onClick={() => patch(p.id, { stage: STAGES[si + 1] })}>→ {STAGES[si + 1]}</button>}
+                            <button type="button" className="btn ghost small" onClick={() => patch(p.id, { parked: true, sortKey: Date.now() })}>Move to Inbox</button>
                             <button type="button" className="btn ghost small" onClick={() => { if (confirm('Delete this project?')) remove(p.id); }}>Delete</button>
                           </div>
                         </>
@@ -87,6 +93,18 @@ export default function Client({ me }) {
             </div>
           </div>
         )}
+      </section>
+
+      <section className="card" aria-labelledby="cinbox-h">
+        <h2 id="cinbox-h">Inbox <span className="sub" style={{ fontSize: 14, fontWeight: 400 }}>on hold · {parked.length}</span></h2>
+        {parked.length === 0 && <div className="empty">Client projects you put on hold land here. Open a project card above and choose "Move to Inbox".</div>}
+        {parked.map((p) => (
+          <div key={p.id} data-drag-id={p.id} className={'task' + dragClass(p)}>
+            {handle(p)}
+            <span className="title" style={{ cursor: 'default' }}>{p.title}<span className="sub" style={{ display: 'block', fontSize: 12 }}>{[nameOf(p.clientId), p.stage, p.deadline && 'due ' + p.deadline].filter(Boolean).join(' · ')}</span></span>
+            <button type="button" className="btn ghost small" onClick={() => patch(p.id, { parked: false })}>Make active</button>
+          </div>
+        ))}
       </section>
 
       <SectionInbox me={me} listId="client" />
@@ -117,7 +135,7 @@ export default function Client({ me }) {
             <section className="card" aria-label="Projects">
               <h2>Projects</h2>
               {nextDeadline && <div className="note">Next deadline: <b>{nextDeadline.title}</b> · {nextDeadline.deadline}</div>}
-              {cProjects.map((p) => <div key={p.id} className="task"><span style={{ flex: 1 }}>{p.title}</span><select className="field" style={{ width: 'auto', minHeight: 34 }} value={p.stage} onChange={(e) => patch(p.id, { stage: e.target.value })} aria-label={'Stage of ' + p.title}>{STAGES.map((s) => <option key={s}>{s}</option>)}</select></div>)}
+              {cProjects.map((p) => <div key={p.id} className="task"><span style={{ flex: 1 }}>{p.title}{p.parked && <span className="sub"> · on hold</span>}</span><select className="field" style={{ width: 'auto', minHeight: 34 }} value={p.stage} onChange={(e) => patch(p.id, { stage: e.target.value })} aria-label={'Stage of ' + p.title}>{STAGES.map((s) => <option key={s}>{s}</option>)}</select></div>)}
               <form className="row" onSubmit={(e) => { e.preventDefault(); if (newProj.trim()) { save('cproject', { clientId: client.id, title: newProj.trim(), stage: 'Brief', notes: [], deadline: null }); setNewProj(''); } }}>
                 <input className="field" style={{ flex: 1 }} value={newProj} onChange={(e) => setNewProj(e.target.value)} placeholder="New project" aria-label="New project" />
                 <button className="btn small" type="submit">Add</button>

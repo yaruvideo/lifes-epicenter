@@ -6,7 +6,7 @@ export default function TaskRow({ t, me, all = [], onCheck, onOpen, handle, clas
   const subs = t.subtasks || [];
   const overdue = t.due && !t.done && t.due < todayStr();
   return (
-    <div className={'task' + (t.done ? ' isdone' : '') + className} data-task-id={t.id}>
+    <div className={'task' + (t.done ? ' isdone' : '') + className} data-task-id={t.id} data-drag-id={t.id}>
       {handle}
       <button type="button" className={'check' + (t.done ? ' done' : '')} aria-label={(t.done ? 'Mark not done: ' : 'Complete: ') + t.title} onClick={() => onCheck(t)}>{t.done ? '✓' : ''}</button>
       <button type="button" className="title" onClick={() => onOpen(t)}>
