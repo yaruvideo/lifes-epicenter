@@ -4,18 +4,18 @@ import { useItems } from '../store.js';
 import Live from './Live.jsx';
 import SectionInbox from './SectionInbox.jsx';
 import useDragSort, { sortKeyOf } from './useDragSort.jsx';
+import { DEFAULT_TEMPLATES, VIDEO_STAGES, fromTemplate, saveTemplates, useTemplates } from '../projects.js';
 
-const STAGES = ['Idea', 'Script', 'Record', 'Edit', 'Publish'];
-const TEMPLATES = {
-  long: { name: 'Long-form', desc: 'A full episode with a written script.', outline: 'Hook (first 30s):\n\nIntro:\n\nMain points:\n1.\n2.\n3.\n\nOutro / call to action:', lists: { Idea: ['Working title', 'Who is it for?'], Script: ['Outline', 'Full draft', 'Read-through'], Record: ['Set up mic + lighting', 'Record A-roll', 'Record B-roll'], Edit: ['Rough cut', 'Music + SFX', 'Captions', 'Color + audio pass'], Publish: ['Thumbnail', 'Title + description', 'Tags + end screen', 'Schedule'] } },
-  journal: { name: 'Play journal', desc: 'Your journaling series. Pulls notes from a game\'s session log.', outline: 'Session recap:\n\nHighlights & timestamps:\n\nThoughts / reactions:\n\nNext session plan:', lists: { Idea: ['Pick the game + session'], Script: ['Pull notes from the game\'s session log'], Record: ['Record gameplay', 'Record voiceover'], Edit: ['Cut highlights', 'Add chapter markers'], Publish: ['Thumbnail', 'Title (Ep #)', 'Add to playlist'] } },
-  devlog: { name: 'Devlog', desc: 'Show what changed in your game. Links to Game Dev cards.', outline: 'What I worked on:\n\nShow & tell:\n\nProblems + how I solved them:\n\nWhat\'s next:', lists: { Idea: ['Pick features to show'], Script: ['Bullet points from Game Dev notes'], Record: ['Capture footage', 'Record voiceover'], Edit: ['Cut + captions'], Publish: ['Thumbnail', 'Post links (Steam, socials)'] } },
-  short: { name: 'Short', desc: 'Vertical, under 60 seconds.', outline: 'Hook (1s):\n\nPayoff:\n\nLoop back:', lists: { Idea: ['Hook idea'], Script: ['3-line script'], Record: ['Vertical capture'], Edit: ['Captions', 'Under 60s'], Publish: ['Title + hashtags'] } }
-};
+// Each video carries its own steps (v.stages) so its layout can change after a template is applied.
+const stagesOf = (v) => (v.stages && v.stages.length ? v.stages : VIDEO_STAGES);
+const templateLabel = (v) => v.templateName || (DEFAULT_TEMPLATES.video.find((t) => t.id === v.template) || {}).name || 'Custom';
+const stageRank = (v) => { const st = stagesOf(v); return st.length > 1 ? st.indexOf(v.stage) / (st.length - 1) : 0; };
 
 // Matches the mockup: one row per video with its stage strip, the picked video's details below.
 function Details({ v, me }) {
-  const t = TEMPLATES[v.template] || TEMPLATES.long;
+  const STAGES = stagesOf(v);
+  const templates = useTemplates('video');
+  const [editSteps, setEditSteps] = useState(false);
   const set = (c) => save('video', { ...v, ...c }, v.id);
   const list = v.checklist?.[v.stage] || [];
   const setList = (l) => set({ checklist: { ...v.checklist, [v.stage]: l } });
@@ -29,7 +29,7 @@ function Details({ v, me }) {
     <section className="card" aria-label="Project details" style={{ gap: 18 }}>
       <div className="row between" style={{ alignItems: 'flex-start' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="sub" style={{ fontSize: 13 }}>{[v.parked && 'On hold (in Inbox)', v.series, t.name + ' template'].filter(Boolean).join(' · ')}</div>
+          <div className="sub" style={{ fontSize: 13 }}>{[v.parked && 'On hold (in Inbox)', v.series, templateLabel(v) === 'Custom' ? 'Custom layout' : templateLabel(v) + ' template'].filter(Boolean).join(' · ')}</div>
           <Live className="field display" style={{ fontSize: 26, fontWeight: 600, background: 'transparent', border: 0, padding: 0, minHeight: 0 }} value={v.title} onSave={(val) => set({ title: val || 'Untitled video' })} aria-label="Video title" />
         </div>
         {!v.done ? <button type="button" className="btn vid" onClick={advance}>{i < STAGES.length - 1 ? 'Move to ' + STAGES[i + 1] + ' →' : 'Mark published ✓'}</button>
@@ -62,11 +62,55 @@ function Details({ v, me }) {
           </div>
         </div>
       </div>
+      {editSteps && <StepsEditor v={v} set={set} />}
       <div className="row">
+        <button type="button" className="btn ghost small" aria-expanded={editSteps} onClick={() => setEditSteps(!editSteps)}>{editSteps ? 'Done editing steps' : '✎ Edit steps'}</button>
+        <button type="button" className="btn ghost small" onClick={() => {
+          const name = prompt('Name for the new template:', templateLabel(v) === 'Custom' ? v.title : templateLabel(v) + ' (custom)');
+          if (name) saveTemplates('video', [...templates, { id: newId(), name, desc: 'Saved from "' + v.title + '"', outline: v.script || '', steps: STAGES.map((n) => ({ name: n, items: (v.checklist?.[n] || []).map((c) => c.text) })) }]).then(() => alert('Saved. It\'s in "+ New video" and in Settings → Project templates.'));
+        }}>Save as template</button>
         {!v.done && <button type="button" className="btn ghost small" onClick={() => patch(v.id, v.parked ? { parked: false } : { parked: true, sortKey: Date.now() })}>{v.parked ? '↑ Make active again' : '↓ Move to Inbox (on hold)'}</button>}
         <button type="button" className="btn ghost small" onClick={() => { if (confirm('Delete this video project?')) remove(v.id); }}>Delete video</button>
       </div>
     </section>
+  );
+}
+
+// Change one video's steps after it's made: rename (its checklist follows), reorder, add or remove.
+function StepsEditor({ v, set }) {
+  const st = stagesOf(v);
+  const cl = v.checklist || {};
+  const rename = (from, to) => {
+    to = to.trim();
+    if (!to || to === from || st.includes(to)) return false;
+    const { [from]: items, ...rest } = cl;
+    set({ stages: st.map((x) => (x === from ? to : x)), checklist: { ...rest, [to]: items || [] }, stage: v.stage === from ? to : v.stage });
+    return true;
+  };
+  const move = (i, d) => { const s = [...st]; const j = i + d; if (j < 0 || j >= s.length) return; [s[i], s[j]] = [s[j], s[i]]; set({ stages: s }); };
+  const drop = (name) => {
+    const n = (cl[name] || []).length;
+    if (n && !confirm('Remove the "' + name + '" step and its ' + n + ' checklist item(s)?')) return;
+    const { [name]: _gone, ...rest } = cl;
+    const s = st.filter((x) => x !== name);
+    set({ stages: s, checklist: rest, stage: v.stage === name ? s[Math.max(0, st.indexOf(name) - 1)] : v.stage });
+  };
+  const add = () => { let n = 'New step', k = 2; while (st.includes(n)) n = 'New step ' + k++; set({ stages: [...st, n], checklist: { ...cl, [n]: [] } }); };
+  return (
+    <div className="note" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <b>Steps for this video</b>
+      <div className="sub" style={{ fontSize: 13 }}>Only this video changes. Each step keeps its own checklist, which you edit by picking the step in the strip above.</div>
+      {st.map((name, i) => (
+        <div key={name} className="row" style={{ flexWrap: 'nowrap' }}>
+          <input className="field" style={{ flex: 1 }} defaultValue={name} aria-label={'Rename step ' + name} onBlur={(e) => { if (!rename(name, e.target.value)) e.target.value = name; }} />
+          <span className="sub" style={{ fontSize: 13, whiteSpace: 'nowrap' }}>{(cl[name] || []).length} items</span>
+          <button type="button" className="btn ghost small" disabled={i === 0} aria-label={'Move ' + name + ' earlier'} onClick={() => move(i, -1)}>↑</button>
+          <button type="button" className="btn ghost small" disabled={i === st.length - 1} aria-label={'Move ' + name + ' later'} onClick={() => move(i, 1)}>↓</button>
+          <button type="button" className="btn ghost small" disabled={st.length < 2} aria-label={'Remove step ' + name} onClick={() => drop(name)}>✕</button>
+        </div>
+      ))}
+      <button type="button" className="btn ghost small" style={{ alignSelf: 'flex-start' }} onClick={add}>+ Add step</button>
+    </div>
   );
 }
 
@@ -77,9 +121,10 @@ const progress = (v) => {
 };
 
 function Strip({ v, onStage }) {
+  const STAGES = stagesOf(v);
   const i = STAGES.indexOf(v.stage);
   return (
-    <span style={{ flex: '2 1 360px', display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 4 }}>
+    <span style={{ flex: '2 1 360px', display: 'grid', gridTemplateColumns: 'repeat(' + STAGES.length + ', minmax(0, 1fr))', gap: 4 }}>
       {STAGES.map((s, j) => (
         <span key={s} className={'stage' + (v.done || j < i ? ' past' : j === i ? ' now' : '')} onClick={onStage ? (e) => { e.stopPropagation(); onStage(s); } : undefined}>{s}</span>
       ))}
@@ -98,8 +143,8 @@ export default function Video({ me }) {
   const byDate = (a, b) => (a.publishDate || '9999').localeCompare(b.publishDate || '9999') || (b.created || 0) - (a.created || 0);
   const sorters = {
     date: byDate,
-    stage: (a, b) => STAGES.indexOf(b.stage) - STAGES.indexOf(a.stage) || byDate(a, b),
-    stageUp: (a, b) => STAGES.indexOf(a.stage) - STAGES.indexOf(b.stage) || byDate(a, b),
+    stage: (a, b) => stageRank(b) - stageRank(a) || byDate(a, b),
+    stageUp: (a, b) => stageRank(a) - stageRank(b) || byDate(a, b),
     mine: (a, b) => sortKeyOf(a) - sortKeyOf(b),
     series: (a, b) => (a.series || '~').localeCompare(b.series || '~') || byDate(a, b),
     progress: (a, b) => progress(b) - progress(a) || byDate(a, b),
@@ -113,14 +158,15 @@ export default function Video({ me }) {
   const { handle, dragClass } = useDragSort(parked);
   const done = videos.filter((v) => v.done).sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0));
   const sel = videos.find((v) => v.id === selId) || active[0];
-  const create = (k) => {
-    const t = TEMPLATES[k];
-    const checklist = Object.fromEntries(STAGES.map((s) => [s, (t.lists[s] || []).map((text) => ({ id: newId(), text, done: false }))]));
-    save('video', { title: 'New ' + t.name.toLowerCase(), template: k, stage: 'Idea', checklist, script: t.outline, notes: '', created: Date.now() }).then((v) => { setPicker(false); setSelId(v.id); });
+  const templates = useTemplates('video');
+  // t is a template, or null for a blank project with the usual five steps and empty checklists.
+  const create = (t) => {
+    const { stages, checklist } = fromTemplate(t, VIDEO_STAGES);
+    save('video', { title: t ? 'New ' + t.name.toLowerCase() : 'New video', template: t?.id || null, templateName: t?.name || 'Custom', stages, stage: stages[0], checklist, script: t?.outline || '', notes: '', created: Date.now() }).then((v) => { setPicker(false); setSelId(v.id); });
   };
   const row = (v) => {
     const l = v.checklist?.[v.stage] || [];
-    const meta = [v.series || (TEMPLATES[v.template] || TEMPLATES.long).name, v.done ? 'Published ' + new Date(v.publishedAt || Date.now()).toLocaleDateString([], { month: 'short', day: 'numeric' }) : v.publishDate ? 'Publish ' + new Date(v.publishDate + 'T12:00').toLocaleDateString([], { month: 'short', day: 'numeric' }) : 'No date', !v.done && l.length ? l.filter((c) => c.done).length + '/' + l.length + ' done' : ''].filter(Boolean).join(' · ');
+    const meta = [v.series || templateLabel(v), v.done ? 'Published ' + new Date(v.publishedAt || Date.now()).toLocaleDateString([], { month: 'short', day: 'numeric' }) : v.publishDate ? 'Publish ' + new Date(v.publishDate + 'T12:00').toLocaleDateString([], { month: 'short', day: 'numeric' }) : 'No date', !v.done && l.length ? l.filter((c) => c.done).length + '/' + l.length + ' done' : ''].filter(Boolean).join(' · ');
     return (
       <div key={v.id} data-drag-id={v.id} role="button" tabIndex={0} className={'vrow' + (sel && v.id === sel.id ? ' on' : '') + (v.done || v.parked ? '' : activeDrag.dragClass(v))} onClick={() => setSelId(v.id)} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setSelId(v.id))} aria-pressed={sel && v.id === sel.id}>
         {!v.done && activeDrag.handle(v)}
@@ -133,7 +179,7 @@ export default function Video({ me }) {
     <>
       <header className="row between" style={{ alignItems: 'flex-end' }}>
         <div><div className="sub row" style={{ gap: 8 }}><span className="dot" style={{ background: '#F2545B' }} />Section</div><h1>Video Projects</h1></div>
-        <button type="button" className="btn vid" onClick={() => setPicker(true)}>+ New video from template</button>
+        <button type="button" className="btn vid" onClick={() => setPicker(true)}>+ New video</button>
       </header>
       <section aria-label="Projects" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {active.length > 1 && (
@@ -164,7 +210,7 @@ export default function Video({ me }) {
             {handle(v)}
             <button type="button" className="title" onClick={() => setSelId(v.id)}>
               {v.title}
-              <span className="sub" style={{ display: 'block', fontSize: 12 }}>{[v.series || (TEMPLATES[v.template] || TEMPLATES.long).name, v.stage, v.publishDate && 'Publish ' + v.publishDate].filter(Boolean).join(' · ')}</span>
+              <span className="sub" style={{ display: 'block', fontSize: 12 }}>{[v.series || templateLabel(v), v.stage, v.publishDate && 'Publish ' + v.publishDate].filter(Boolean).join(' · ')}</span>
             </button>
             <button type="button" className="btn ghost small" onClick={() => { patch(v.id, { parked: false }); setSelId(v.id); }}>Make active</button>
           </div>
@@ -173,15 +219,18 @@ export default function Video({ me }) {
       <SectionInbox me={me} listId="video" />
       {picker && (
         <div className="modal-back" onClick={(e) => e.target === e.currentTarget && setPicker(false)}>
-          <div className="modal" role="dialog" aria-modal="true" aria-label="Start a video from a template">
-            <h2>Start a video from a template</h2>
-            <div className="sub">Each template sets up the script outline and a checklist for every stage.</div>
+          <div className="modal" role="dialog" aria-modal="true" aria-label="Start a new video">
+            <h2>Start a new video</h2>
+            <div className="sub">Pick a template or start blank. Templates are edited in Settings → Project templates.</div>
             <div className="themes" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
-              {Object.entries(TEMPLATES).map(([k, t]) => (
-                <button key={k} type="button" className="theme" onClick={() => create(k)}>
-                  <b>{t.name}</b><span className="sub" style={{ fontSize: 13, lineHeight: 1.4 }}>{t.desc}</span>
+              {templates.map((t) => (
+                <button key={t.id} type="button" className="theme" onClick={() => create(t)}>
+                  <b>{t.name}</b><span className="sub" style={{ fontSize: 13, lineHeight: 1.4 }}>{t.desc || t.steps.map((x) => x.name).join(' → ')}</span>
                 </button>
               ))}
+              <button type="button" className="theme" onClick={() => create(null)}>
+                <b>Blank project</b><span className="sub" style={{ fontSize: 13, lineHeight: 1.4 }}>No template. Starts with the usual steps and empty checklists, and you set it up with "Edit steps".</span>
+              </button>
             </div>
             <button type="button" className="btn ghost" style={{ alignSelf: 'flex-end' }} onClick={() => setPicker(false)}>Cancel</button>
           </div>

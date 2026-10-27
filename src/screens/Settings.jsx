@@ -4,6 +4,7 @@ import { useMe } from '../store.js';
 import { PEOPLE } from '../config.js';
 import { enablePush, pushEnabled } from '../push.js';
 import { refreshApp } from '../refresh.js';
+import ProjectTemplates from './ProjectTemplates.jsx';
 import { createHousehold, currentUser, getClient, householdId, joinHousehold, keys, onStatus, saveKeys, start, syncNow } from '../sync.js';
 
 export default function Settings() {
@@ -125,6 +126,8 @@ export default function Settings() {
           <span className="sub">Syncs, picks up the newest version of the app, and reloads. On PC the button is also at the bottom of the sidebar, and F5 or Ctrl+R works too.</span>
         </div>
       </section>
+
+      <ProjectTemplates />
 
       <section className="card" aria-labelledby="bk-h">
         <h2 id="bk-h">Backup</h2>

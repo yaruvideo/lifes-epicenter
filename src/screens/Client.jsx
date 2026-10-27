@@ -5,8 +5,10 @@ import { useItems, todayStr } from '../store.js';
 import Live from './Live.jsx';
 import SectionInbox from './SectionInbox.jsx';
 import useDragSort, { sortKeyOf } from './useDragSort.jsx';
+import { CLIENT_STAGES, fromTemplate, useTemplates } from '../projects.js';
+import { newId } from '../db.js';
 
-const STAGES = ['Brief', 'In progress', 'Review', 'Revisions', 'Delivered'];
+const STAGES = CLIENT_STAGES;
 const INVOICE = ['Draft', 'Sent', 'Paid'];
 const money = (n) => '$' + (Number(n) || 0).toFixed(2).replace(/\.00$/, '');
 
@@ -24,6 +26,9 @@ export default function Client({ me }) {
   const [cid, setCid] = useState(null);
   const [newClient, setNewClient] = useState('');
   const [newProj, setNewProj] = useState('');
+  const [projTpl, setProjTpl] = useState('');
+  const [checkText, setCheckText] = useState('');
+  const templates = useTemplates('client');
   const [projNote, setProjNote] = useState('');
   const [inv, setInv] = useState({ label: '', amount: '' });
   const [timer, setTimer] = useState(() => device.get('client-timer', null));
@@ -74,6 +79,25 @@ export default function Client({ me }) {
                       </button>
                       {expanded === p.id && (
                         <>
+                          {(() => {
+                            // This step's checklist (from the template, or added here).
+                            const list = p.checklist?.[p.stage] || [];
+                            const setList = (l) => patch(p.id, { checklist: { ...(p.checklist || {}), [p.stage]: l } });
+                            return (
+                              <>
+                                {list.map((c) => (
+                                  <div key={c.id} className="row" style={{ gap: 6, flexWrap: 'nowrap', fontSize: 13 }}>
+                                    <button type="button" className={'check' + (c.done ? ' done' : '')} style={{ width: 22, height: 22, flex: '0 0 22px' }} aria-label={(c.done ? 'Uncheck ' : 'Check ') + c.text} onClick={() => setList(list.map((x) => (x.id === c.id ? { ...x, done: !x.done } : x)))}>{c.done ? '✓' : ''}</button>
+                                    <span style={{ flex: 1, textDecoration: c.done ? 'line-through' : 'none', color: c.done ? 'var(--muted)' : undefined }}>{c.text}</span>
+                                    <button type="button" className="btn ghost small" style={{ minHeight: 26, padding: '0 6px' }} aria-label={'Remove ' + c.text} onClick={() => setList(list.filter((x) => x.id !== c.id))}>✕</button>
+                                  </div>
+                                ))}
+                                <form onSubmit={(e) => { e.preventDefault(); if (checkText.trim()) { setList([...list, { id: newId(), text: checkText.trim(), done: false }]); setCheckText(''); } }}>
+                                  <input className="field" style={{ minHeight: 36 }} value={checkText} onChange={(e) => setCheckText(e.target.value)} placeholder={'Add to ' + p.stage + ' checklist'} aria-label={'Checklist item for ' + p.title} />
+                                </form>
+                              </>
+                            );
+                          })()}
                           {(p.notes || []).map((n, i) => <div key={i} style={{ fontSize: 13, whiteSpace: 'pre-wrap' }}>• {n}</div>)}
                           <form onSubmit={(e) => { e.preventDefault(); if (projNote.trim()) { patch(p.id, { notes: [...(p.notes || []), projNote.trim()] }); setProjNote(''); } }}>
                             <input className="field" style={{ minHeight: 36 }} value={projNote} onChange={(e) => setProjNote(e.target.value)} placeholder="Add a note" aria-label={'Note for ' + p.title} />
@@ -136,8 +160,12 @@ export default function Client({ me }) {
               <h2>Projects</h2>
               {nextDeadline && <div className="note">Next deadline: <b>{nextDeadline.title}</b> · {nextDeadline.deadline}</div>}
               {cProjects.map((p) => <div key={p.id} className="task"><span style={{ flex: 1 }}>{p.title}{p.parked && <span className="sub"> · on hold</span>}</span><select className="field" style={{ width: 'auto', minHeight: 34 }} value={p.stage} onChange={(e) => patch(p.id, { stage: e.target.value })} aria-label={'Stage of ' + p.title}>{STAGES.map((s) => <option key={s}>{s}</option>)}</select></div>)}
-              <form className="row" onSubmit={(e) => { e.preventDefault(); if (newProj.trim()) { save('cproject', { clientId: client.id, title: newProj.trim(), stage: 'Brief', notes: [], deadline: null }); setNewProj(''); } }}>
+              <form className="row" onSubmit={(e) => { e.preventDefault(); if (newProj.trim()) { const t = templates.find((x) => x.id === projTpl) || null; save('cproject', { clientId: client.id, title: newProj.trim(), stage: STAGES[0], notes: [], deadline: null, template: t?.id || null, templateName: t?.name || 'Custom', checklist: fromTemplate(t, STAGES).checklist }); setNewProj(''); } }}>
                 <input className="field" style={{ flex: 1 }} value={newProj} onChange={(e) => setNewProj(e.target.value)} placeholder="New project" aria-label="New project" />
+                <select className="field" style={{ width: 'auto' }} value={projTpl} onChange={(e) => setProjTpl(e.target.value)} aria-label="Template for the new project">
+                  <option value="">Blank</option>
+                  {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
                 <button className="btn small" type="submit">Add</button>
               </form>
             </section>
