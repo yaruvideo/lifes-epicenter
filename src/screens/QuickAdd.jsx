@@ -2,17 +2,21 @@ import { useState } from 'react';
 import { addTask } from '../tasks.js';
 import { other } from '../store.js';
 import { PEOPLE } from '../config.js';
+import useTaskActions from './useTaskActions.jsx';
 
 export default function QuickAdd({ me, extra, placeholder = 'Add a task…', defaultOwner }) {
   const [title, setTitle] = useState('');
   const [owner, setOwner] = useState(defaultOwner || me);
+  const { onOpen, overlays } = useTaskActions(me);
+  // A new task opens its details right away so due date, list, notes etc. can be filled in.
   const submit = (e) => {
     e.preventDefault();
     if (!title.trim()) return;
-    addTask(title, me, { owner, ...extra });
+    addTask(title, me, { owner, ...extra }).then(onOpen);
     setTitle('');
   };
   return (
+    <>
     <form className="row" onSubmit={submit}>
       <input className="field" style={{ flex: '1 1 240px' }} value={title} onChange={(e) => setTitle(e.target.value)} placeholder={placeholder} aria-label="New task" />
       <select className="field" style={{ width: 'auto' }} value={owner} onChange={(e) => setOwner(e.target.value)} aria-label="For whom">
@@ -22,5 +26,7 @@ export default function QuickAdd({ me, extra, placeholder = 'Add a task…', def
       </select>
       <button className="btn" type="submit">Add</button>
     </form>
+    {overlays}
+    </>
   );
 }
