@@ -26,6 +26,16 @@ export default function Tasks({ me }) {
   ];
   const prefs = useItems('prefs').find((p) => p.id === 'prefs-' + me) || {};
   const [editing, setEditing] = useState(false);
+  const [listDrag, setListDrag] = useState(null);
+  const dropList = () => {
+    if (listDrag && listDrag.over !== listDrag.id) {
+      const ids = ordered.map((f) => f[0]).filter((x) => x !== listDrag.id);
+      const from = ordered.findIndex((f) => f[0] === listDrag.id), to = ordered.findIndex((f) => f[0] === listDrag.over);
+      ids.splice(ids.indexOf(listDrag.over) + (to > from ? 1 : 0), 0, listDrag.id);
+      save('prefs', { ...prefs, listOrder: ids }, 'prefs-' + me);
+    }
+    setListDrag(null);
+  };
   const [newList, setNewList] = useState('');
   const addList = (e) => {
     e.preventDefault();
@@ -111,14 +121,18 @@ export default function Tasks({ me }) {
       {editing && (
         <section className="card" aria-labelledby="lists-h">
           <h2 id="lists-h">Your lists</h2>
-          <div className="sub" style={{ fontSize: 13 }}>Use the arrows to change the order of the tabs. Built-in views can be moved but not renamed or removed.</div>
+          <div className="sub" style={{ fontSize: 13 }}>Drag the ⋮⋮ handle to change the order of the tabs. Built-in views can be moved but not renamed or removed.</div>
           {ordered.map(([id, label], i) => {
             const own = lists.some((l) => l[0] === id);
             return (
-              <div key={id + label} className="row" style={{ flexWrap: 'nowrap' }}>
-                <span className="row" style={{ gap: 4, flexWrap: 'nowrap' }}>
-                  <button type="button" className="btn ghost small" disabled={i === 0} aria-label={'Move ' + label + ' up'} onClick={() => moveList(id, -1)}>↑</button>
-                  <button type="button" className="btn ghost small" disabled={i === ordered.length - 1} aria-label={'Move ' + label + ' down'} onClick={() => moveList(id, 1)}>↓</button>
+              <div key={id + label} data-list-id={id} className={'row listrow' + (listDrag ? (listDrag.id === id ? ' dragging' : listDrag.over === id ? (i > ordered.findIndex((f) => f[0] === listDrag.id) ? ' dropbelow' : ' dropabove') : '') : '')} style={{ flexWrap: 'nowrap' }}>
+                <span className="draghandle" aria-hidden="true" title="Drag to reorder"
+                  onPointerDown={(e) => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); setListDrag({ id, over: id }); }}
+                  onPointerMove={(e) => { if (!listDrag) return; const el = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-list-id]'); if (el && el.dataset.listId !== listDrag.over) setListDrag({ ...listDrag, over: el.dataset.listId }); }}
+                  onPointerUp={dropList} onPointerCancel={() => setListDrag(null)}>⋮⋮</span>
+                <span className="sr-only">
+                  <button type="button" disabled={i === 0} aria-label={'Move ' + label + ' up'} onClick={() => moveList(id, -1)}>↑</button>
+                  <button type="button" disabled={i === ordered.length - 1} aria-label={'Move ' + label + ' down'} onClick={() => moveList(id, 1)}>↓</button>
                 </span>
                 {own
                   ? <input className="field" style={{ flex: 1 }} defaultValue={label} aria-label={'Rename ' + label}
