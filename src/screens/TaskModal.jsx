@@ -6,7 +6,7 @@ import SubtaskItem from './SubtaskItem.jsx';
 import { PEOPLE } from '../config.js';
 import { other } from '../store.js';
 
-export default function TaskModal({ task, me, onClose }) {
+export default function TaskModal({ task, me, onClose, onCheck }) {
   const [t, setT] = useState(task);
   const [newSub, setNewSub] = useState('');
   const allTasks = useItems('task');
@@ -90,7 +90,10 @@ export default function TaskModal({ task, me, onClose }) {
         {t.outcome && <div className="note"><b>Outcome:</b> {t.outcome}</div>}
         <div className="row between">
           <button type="button" className="btn ghost small" onClick={() => { if (confirm('Delete "' + t.title + '"?')) { remove(t.id); onClose(); } }}>Delete task</button>
-          <button type="button" className="btn" onClick={onClose}>Done</button>
+          <div className="row">
+            <button type="button" className="btn ghost" onClick={onClose}>Close</button>
+            <button type="button" className="btn" onClick={() => onCheck(t)}>{t.done ? 'Mark not done' : '✓ Complete task'}</button>
+          </div>
         </div>
       </div>
     </div>

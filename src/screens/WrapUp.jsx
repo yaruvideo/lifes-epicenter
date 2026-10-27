@@ -11,7 +11,6 @@ export default function WrapUp({ task, onSave, onCancel }) {
         <textarea autoFocus className="field" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); onSave(text); } }} placeholder="Outcome, what changed, what's next" />
         <div className="row" style={{ justifyContent: 'flex-end' }}>
           <button type="button" className="btn ghost" onClick={onCancel}>Cancel</button>
-          <button type="button" className="btn ghost" onClick={() => onSave('')}>Complete without a note</button>
           <button type="submit" className="btn">Save and complete</button>
         </div>
       </form>

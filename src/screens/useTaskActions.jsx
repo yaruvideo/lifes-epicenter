@@ -14,7 +14,7 @@ export default function useTaskActions(me) {
   const overlays = (
     <>
       {wrap && <WrapUp task={wrap} onCancel={() => setWrap(null)} onSave={(text) => { completeTask(wrap, me, text); setWrap(null); }} />}
-      {open && <TaskModal key={open.id} task={open} me={me} onClose={() => setOpen(null)} />}
+      {open && <TaskModal key={open.id} task={open} me={me} onClose={() => setOpen(null)} onCheck={(t) => { setOpen(null); onCheck(t); }} />}
     </>
   );
   return { onCheck, onOpen: setOpen, overlays };
