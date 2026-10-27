@@ -43,7 +43,7 @@ main { flex: 1; min-width: 0; padding: 32px; display: flex; flex-direction: colu
 .btn:disabled { opacity: .5; cursor: default; }
 .field { min-height: 44px; padding: 0 12px; border-radius: var(--r); border: 1px solid var(--border); background: var(--inner); width: 100%; min-width: 0; }
 textarea.field { padding: 10px 12px; min-height: 80px; resize: vertical; line-height: 1.5; }
-label.lbl { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); }
+.lbl { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); }
 
 .seg { display: inline-flex; gap: 4px; padding: 4px; background: var(--inner); border-radius: calc(var(--r) + 2px); flex-wrap: wrap; }
 .seg button { min-height: 36px; padding: 0 12px; border-radius: var(--r); border: 0; background: transparent; color: var(--muted); cursor: pointer; }
@@ -101,3 +101,8 @@ label.lbl { display: flex; flex-direction: column; gap: 6px; font-size: 13px; co
 .task.dropbelow, .listrow.dropbelow { box-shadow: inset 0 -3px 0 var(--accent); }
 .navbtn { background: none; border: 0; font: inherit; cursor: pointer; text-align: left; width: 100%; }
 .listrow { border-radius: var(--r); padding: 3px 0; }
+.searchpick { position: relative; }
+.searchpick-list { position: absolute; z-index: 5; left: 0; right: 0; top: calc(100% + 4px); background: var(--panel); border: 1px solid var(--border); border-radius: var(--r); padding: 4px; display: flex; flex-direction: column; max-height: 280px; overflow-y: auto; box-shadow: 0 8px 24px rgba(0,0,0,.4); }
+.searchpick-list button { text-align: left; background: none; border: 0; padding: 8px 10px; border-radius: calc(var(--r) - 4px); cursor: pointer; color: var(--text); font: inherit; }
+.searchpick-list button:hover, .searchpick-list button:focus-visible { background: var(--inner); }
+.searchpick-chosen { align-items: center; }

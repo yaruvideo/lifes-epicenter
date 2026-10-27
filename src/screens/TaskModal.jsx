@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { newId, patch, remove, save } from '../db.js';
 import { useItems, todayStr } from '../store.js';
-import { PRIORITY_ORDER, useLists, weekEnd, updateSub } from '../tasks.js';
+import { PRIORITY_ORDER, listName, useLists, weekEnd, updateSub } from '../tasks.js';
 import SubtaskItem from './SubtaskItem.jsx';
+import SearchPick from './SearchPick.jsx';
 import { PEOPLE } from '../config.js';
 import { other } from '../store.js';
 
@@ -61,12 +62,10 @@ export default function TaskModal({ task, me, onClose, onCheck }) {
               <option value="">Never</option><option value="daily">Daily</option><option value="weekdays">Weekdays</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option>
             </select>
           </label>
-          <label className="lbl">Waiting on
-            <select className="field" value={t.waitingOn || ''} onChange={(e) => set({ waitingOn: e.target.value || null })}>
-              <option value="">Nothing</option>
-              {others.map((o) => <option key={o.id} value={o.id}>{o.title}</option>)}
-            </select>
-          </label>
+          <div className="lbl">Waiting on
+            <SearchPick label="Waiting on" value={t.waitingOn} onChange={(id) => set({ waitingOn: id })}
+              options={others.map((o) => ({ id: o.id, label: o.title, hint: listName(o.list, lists) }))} placeholder="Nothing (type to search)" />
+          </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, justifyContent: 'center' }}>
             <label className="lbl" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <input type="checkbox" checked={!!t.myDay} onChange={(e) => set({ myDay: e.target.checked })} style={{ width: 20, height: 20, accentColor: 'var(--accent)' }} />

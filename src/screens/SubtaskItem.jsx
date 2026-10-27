@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { save } from '../db.js';
 import { MAX_SUB_DEPTH, cloneSubs, flatSubs, subBlocker } from '../tasks.js';
 import { newId } from '../db.js';
+import SearchPick from './SearchPick.jsx';
 
 // One sub-task (and, inside it, its own steps). Clicking it opens the details: name, dates, waiting on, notes and the less-used buttons.
 export default function SubtaskItem({ s, depth, task, tasks, onUpdate }) {
@@ -45,13 +46,10 @@ export default function SubtaskItem({ s, depth, task, tasks, onUpdate }) {
             <label className="lbl">Remind me
               <input type="datetime-local" className="field" value={s.remindAt || ''} onChange={(e) => set({ remindAt: e.target.value || null })} aria-label={'Reminder for ' + s.title} />
             </label>
-            <label className="lbl">Waiting on
-              <select className="field" value={s.waitingOn || ''} onChange={(e) => set({ waitingOn: e.target.value || null })}>
-                <option value="">Nothing</option>
-                {choices.length > 0 && <optgroup label="Steps in this task">{choices.map((x) => <option key={x.s.id} value={x.s.id}>{'  '.repeat(x.depth - 1) + x.s.title}</option>)}</optgroup>}
-                <optgroup label="Other tasks">{tasks.filter((x) => x.id !== task.id && !x.done).map((x) => <option key={x.id} value={x.id}>{x.title}</option>)}</optgroup>
-              </select>
-            </label>
+            <div className="lbl">Waiting on
+              <SearchPick label={'Waiting on, for ' + s.title} value={s.waitingOn} onChange={(id) => set({ waitingOn: id })} placeholder="Nothing (type to search)"
+                options={[...choices.map((x) => ({ id: x.s.id, label: x.s.title, hint: 'step in this task' })), ...tasks.filter((x) => x.id !== task.id && !x.done).map((x) => ({ id: x.id, label: x.title, hint: 'task' }))]} />
+            </div>
           </div>
           <label className="lbl">Notes
             <textarea className="field" value={s.notes || ''} onChange={(e) => set({ notes: e.target.value })} placeholder="Details, links, anything to remember" />
