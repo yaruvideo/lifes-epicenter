@@ -48,7 +48,7 @@ export default function Client({ me }) {
 
   return (
     <>
-      <header><div className="sub">Section</div><h1>Client Work</h1></header>
+      <header><div className="sub row" style={{ gap: 8 }}><span className="dot" style={{ background: '#7FA8F5' }} />Section</div><h1>Client Work</h1></header>
 
       <section className="card" aria-labelledby="ov-h">
         <div className="row between">

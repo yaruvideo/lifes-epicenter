@@ -15,9 +15,11 @@ function CardModal({ card, onClose }) {
         <input className="field display" autoFocus style={{ fontSize: 22, fontWeight: 600, background: 'transparent', border: 0, padding: 0 }} value={c.title} onChange={(e) => set({ title: e.target.value })} aria-label="Card title" />
         <div className="row">
           <label className="lbl" style={{ flex: 1 }}>Column<select className="field" value={c.column} onChange={(e) => set({ column: e.target.value })}>{COLUMNS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
+          <label className="lbl" style={{ flex: 1 }}>Start<input type="date" className="field" value={c.start || ''} onChange={(e) => set({ start: e.target.value || null })} /></label>
           <label className="lbl" style={{ flex: 1 }}>Due<input type="date" className="field" value={c.due || ''} onChange={(e) => set({ due: e.target.value || null })} /></label>
           <label className="lbl" style={{ flex: 1 }}>Tag<input className="field" value={c.tag || ''} onChange={(e) => set({ tag: e.target.value })} placeholder="Art, code, audio…" /></label>
         </div>
+        <label className="row" style={{ gap: 8, fontSize: 14 }}><input type="checkbox" checked={!!c.milestone} onChange={(e) => set({ milestone: e.target.checked })} /> Milestone (shows as ◆ on the Timeline)</label>
         <label className="lbl">Notes<textarea className="field" style={{ minHeight: 140 }} value={c.notes || ''} onChange={(e) => set({ notes: e.target.value })} /></label>
         <div className="row between">
           <button type="button" className="btn ghost small" onClick={() => { if (confirm('Delete this card?')) { remove(c.id); onClose(); } }}>Delete card</button>
@@ -25,6 +27,43 @@ function CardModal({ card, onClose }) {
         </div>
       </div>
     </div>
+  );
+}
+
+// Six weeks from the start of this week. Cards need a due date (and optionally a start) to show.
+function Timeline({ cards, onOpen }) {
+  const day = 864e5;
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  const w0 = new Date(now - now.getDay() * day);
+  const weeks = [...Array(6)].map((_, i) => new Date(+w0 + i * 7 * day));
+  const end = +w0 + 42 * day;
+  const at = (d) => new Date(d + 'T00:00');
+  const col = (d) => Math.max(0, Math.min(5, Math.floor((at(d) - w0) / (7 * day))));
+  const label = Object.fromEntries(COLUMNS);
+  const dated = cards.filter((c) => c.due && !c.milestone && at(c.due) >= w0 && at(c.start || c.due) < end).sort((a, b) => (a.start || a.due).localeCompare(b.start || b.due));
+  const miles = cards.filter((c) => c.milestone && c.due && at(c.due) >= w0 && at(c.due) < end);
+  const grid = { display: 'grid', gridTemplateColumns: '220px repeat(6, minmax(0, 1fr))', alignItems: 'center', minHeight: 40 };
+  return (
+    <section className="card" style={{ overflowX: 'auto' }}>
+      <div style={{ minWidth: 820, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ ...grid, minHeight: 0, fontSize: 12, fontWeight: 600, color: 'var(--muted)' }}><span />{weeks.map((w) => <span key={+w}>{w.toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>)}</div>
+        {dated.length === 0 && <div className="empty">Give cards a due date (and a start date for longer work) to see them here.</div>}
+        {dated.map((c) => {
+          const a = c.start ? col(c.start) : col(c.due);
+          return (
+            <div key={c.id} style={grid}>
+              <button type="button" className="linkish" style={{ fontWeight: 500, paddingRight: 12 }} onClick={() => onOpen(c.id)}>{c.title}</button>
+              <span style={{ gridColumn: (a + 2) + ' / span ' + (col(c.due) - a + 1), height: 28, borderRadius: 8, background: c.column === 'done' ? 'var(--inner)' : '#FF9F45', color: c.column === 'done' ? 'var(--muted)' : '#131019', fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', padding: '0 10px', marginRight: 4 }}>{label[c.column]} · due {at(c.due).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
+            </div>
+          );
+        })}
+        <div style={{ ...grid, borderTop: '1px dashed var(--border)', paddingTop: 8 }}>
+          <span style={{ fontWeight: 600, color: '#F2545B' }}>Milestones</span>
+          {miles.length === 0 ? <span className="sub" style={{ gridColumn: '2 / span 6', fontSize: 13 }}>Tick "Milestone" on a card to pin it here.</span>
+            : miles.map((m) => <button key={m.id} type="button" className="linkish" style={{ gridColumn: (col(m.due) + 2) + ' / span 1', gridRow: 1, fontSize: 13, fontWeight: 600, color: '#F2545B' }} onClick={() => onOpen(m.id)}>◆ {m.title}</button>)}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -57,9 +96,9 @@ export default function GameDev({ me }) {
 
   return (
     <>
-      <header><div className="sub">Section</div><h1>Game Dev</h1></header>
+      <header><div className="sub row" style={{ gap: 8 }}><span className="dot" style={{ background: '#FF9F45' }} />Section</div><h1>Game Dev</h1></header>
       <div className="seg" role="tablist" aria-label="View">
-        {[['board', 'Board'], ['list', 'List'], ['notes', 'Notes'], ['docs', 'Docs'], ['links', 'Links']].map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={view === k} aria-pressed={view === k} onClick={() => setView(k)}>{l}</button>)}
+        {[['board', 'Board'], ['list', 'List'], ['notes', 'Notes'], ['timeline', 'Timeline'], ['docs', 'Docs'], ['links', 'Links']].map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={view === k} aria-pressed={view === k} onClick={() => setView(k)}>{l}</button>)}
       </div>
 
       {view === 'board' && (
@@ -120,6 +159,7 @@ export default function GameDev({ me }) {
         </section>
       )}
 
+      {view === 'timeline' && <Timeline cards={cards} onOpen={setOpenId} />}
       {view === 'docs' && (
         <div className="row" style={{ alignItems: 'flex-start' }}>
           <section className="card" style={{ flex: '1 1 220px' }}>
