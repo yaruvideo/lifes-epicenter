@@ -1,6 +1,7 @@
 import { all, device } from './db.js';
 import { todayStr } from './store.js';
 import { medLogId } from './health.js';
+import { flatSubs } from './tasks.js';
 
 // Checks every 30 seconds while the app is open (or minimized) and shows a
 // Windows/Android notification for meds and task reminders that are due.
@@ -39,7 +40,7 @@ async function check(me) {
   for (const t of tasks) {
     if (t.done || (t.owner !== me && t.owner !== 'both')) continue;
     if (t.remindAt && t.remindAt <= stamp) fire('task-' + t.id + '-' + t.remindAt, t.title, t.due ? 'Due ' + t.due : 'Task reminder');
-    for (const s of t.subtasks || []) {
+    for (const { s } of flatSubs(t.subtasks)) {
       if (!s.done && s.remindAt && s.remindAt <= stamp) fire('sub-' + s.id + '-' + s.remindAt, s.title, 'Part of: ' + t.title);
     }
   }

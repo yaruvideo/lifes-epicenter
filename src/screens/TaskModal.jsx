@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { newId, patch, remove, save } from '../db.js';
 import { useItems, todayStr } from '../store.js';
-import { LISTS, weekEnd } from '../tasks.js';
+import { LISTS, weekEnd, updateSub } from '../tasks.js';
+import SubtaskItem from './SubtaskItem.jsx';
 import { PEOPLE } from '../config.js';
 import { other } from '../store.js';
 
 export default function TaskModal({ task, me, onClose }) {
   const [t, setT] = useState(task);
   const [newSub, setNewSub] = useState('');
-  const others = useItems('task').filter((x) => x.id !== task.id && !x.done);
+  const allTasks = useItems('task');
+  const others = allTasks.filter((x) => x.id !== task.id && !x.done);
   const ref = useRef(null);
   useEffect(() => { ref.current?.focus(); }, []);
   useEffect(() => {
@@ -18,11 +20,10 @@ export default function TaskModal({ task, me, onClose }) {
   }, [onClose]);
 
   const set = (changes) => { const next = { ...t, ...changes }; setT(next); patch(t.id, changes); };
-  const setSub = (id, changes) => set({ subtasks: t.subtasks.map((s) => (s.id === id ? { ...s, ...changes } : s)) });
   const addSub = (e) => {
     e.preventDefault();
     if (!newSub.trim()) return;
-    set({ subtasks: [...(t.subtasks || []), { id: newId(), title: newSub.trim(), done: false, due: null }] });
+    set({ subtasks: [...(t.subtasks || []), { id: newId(), title: newSub.trim(), done: false, due: null, notes: '', subtasks: [] }] });
     setNewSub('');
   };
 
@@ -80,24 +81,7 @@ export default function TaskModal({ task, me, onClose }) {
           <textarea className="field" value={t.notes || ''} onChange={(e) => set({ notes: e.target.value })} placeholder="Details, links, anything to remember" />
         </label>
         <div className="row between"><h2>Sub-tasks</h2></div>
-        {(t.subtasks || []).map((s) => (
-          <div key={s.id} className="task subtask">
-            <div className="row" style={{ flexWrap: 'nowrap' }}>
-              <button type="button" className={'check' + (s.done ? ' done' : '')} aria-label={(s.done ? 'Mark not done: ' : 'Complete: ') + s.title} onClick={() => setSub(s.id, { done: !s.done })}>{s.done ? '✓' : ''}</button>
-              <input className="field" style={{ flex: 1, background: 'transparent', border: 0, padding: 0, textDecoration: s.done ? 'line-through' : 'none' }} value={s.title} onChange={(e) => setSub(s.id, { title: e.target.value })} aria-label="Sub-task" />
-              <button type="button" className="btn ghost small" title="Make into its own task" onClick={() => { save('task', { title: s.title, owner: t.owner, list: t.list, due: s.due || null, remindAt: s.remindAt || null, priority: null, repeat: null, notes: 'From: ' + t.title, subtasks: [], done: false, myDay: false, created: Date.now() }); set({ subtasks: t.subtasks.filter((x) => x.id !== s.id) }); }}>Make task</button>
-              <button type="button" className="btn ghost small" onClick={() => set({ subtasks: t.subtasks.filter((x) => x.id !== s.id) })} aria-label={'Remove ' + s.title}>✕</button>
-            </div>
-            <div className="row subdates">
-              <label className="lbl">Due
-                <input type="date" className="field" value={s.due || ''} onChange={(e) => setSub(s.id, { due: e.target.value || null })} aria-label={'Due date for ' + s.title} />
-              </label>
-              <label className="lbl">Remind me
-                <input type="datetime-local" className="field" value={s.remindAt || ''} onChange={(e) => setSub(s.id, { remindAt: e.target.value || null })} aria-label={'Reminder for ' + s.title} />
-              </label>
-            </div>
-          </div>
-        ))}
+        {(t.subtasks || []).map((s) => <SubtaskItem key={s.id} s={s} depth={1} task={t} tasks={allTasks} onUpdate={(id, fn) => set({ subtasks: updateSub(t.subtasks, id, fn) })} />)}
         <form className="row" onSubmit={addSub}>
           <input className="field" style={{ flex: 1 }} value={newSub} onChange={(e) => setNewSub(e.target.value)} placeholder="Add a sub-task" aria-label="New sub-task" />
           <button className="btn small" type="submit">Add</button>

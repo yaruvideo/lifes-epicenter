@@ -25,7 +25,7 @@ export async function completeTask(t, me, outcome = '') {
   await save('journal', { type: 'task', text: outcome.trim(), title: t.title, list: t.list, taskId: t.id, by: me, at: Date.now() });
   if (t.repeat) {
     const { id, done, doneAt, doneBy, outcome: _o, ...rest } = t;
-    await save('task', { ...rest, due: nextDue(t.due, t.repeat), subtasks: (t.subtasks || []).map((s) => ({ ...s, id: newId(), done: false })), created: Date.now() });
+    await save('task', { ...rest, due: nextDue(t.due, t.repeat), subtasks: cloneSubs(t.subtasks, true), created: Date.now() });
   }
 }
 
@@ -42,3 +42,22 @@ export const weekEnd = () => {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 };
 export const isThisWeek = (t) => !!(t.myDay || (t.due && t.due <= weekEnd()) || (t.thisWeek && t.thisWeek >= todayStr()));
+
+// Sub-tasks nest: each one can hold its own `subtasks`, `notes` and `waitingOn` (another sub-task here, or another task).
+export const MAX_SUB_DEPTH = 3;
+export const flatSubs = (list = [], depth = 1, parent = null) =>
+  list.flatMap((s) => [{ s, depth, parent }, ...flatSubs(s.subtasks, depth + 1, s)]);
+export const updateSub = (list = [], id, fn) =>
+  list.flatMap((s) => (s.id === id ? [fn(s)].filter(Boolean) : [{ ...s, subtasks: updateSub(s.subtasks, id, fn) }]));
+export const subBlocker = (s, root = [], tasks = []) => {
+  if (!s.waitingOn) return null;
+  const hit = flatSubs(root).find((x) => x.s.id === s.waitingOn)?.s || tasks.find((x) => x.id === s.waitingOn);
+  return hit && !hit.done ? hit : null;
+};
+// Fresh ids for a copied tree (repeating tasks, "Make task"), keeping waiting-on links inside it pointing the right way.
+export function cloneSubs(list = [], reset = false) {
+  const ids = {};
+  for (const { s } of flatSubs(list)) ids[s.id] = newId();
+  const copy = (l) => l.map((s) => ({ ...s, id: ids[s.id], done: reset ? false : s.done, waitingOn: ids[s.waitingOn] || s.waitingOn || null, subtasks: copy(s.subtasks || []) }));
+  return copy(list);
+}

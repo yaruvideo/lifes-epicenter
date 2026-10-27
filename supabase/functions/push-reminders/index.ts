@@ -44,7 +44,8 @@ Deno.serve(async () => {
     if (t.done) continue;
     const people = t.owner === "both" ? ["yaru", "hannah"] : [t.owner];
     if (t.remindAt && t.remindAt <= stamp && t.remindAt > yesterday) due.push({ key: `task-${r.id}-${t.remindAt}`, people, title: t.title, body: t.due ? `Due ${t.due}` : "Task reminder" });
-    for (const s of t.subtasks || []) {
+    const flat = (l: any[] = []): any[] => l.flatMap((s) => [s, ...flat(s.subtasks)]);
+    for (const s of flat(t.subtasks)) {
       if (!s.done && s.remindAt && s.remindAt <= stamp && s.remindAt > yesterday) due.push({ key: `sub-${s.id}-${s.remindAt}`, people, title: s.title, body: `Part of: ${t.title}` });
     }
   }

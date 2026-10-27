@@ -92,3 +92,6 @@ label.lbl { display: flex; flex-direction: column; gap: 6px; font-size: 13px; co
 .task.subtask { flex-direction: column; align-items: stretch; gap: 8px; }
 .subdates { flex-wrap: wrap; gap: 12px; padding-left: 40px; }
 .subdates .lbl { flex: 1 1 200px; }
+.subdetails { display: flex; flex-direction: column; gap: 10px; padding-left: 40px; }
+.subdetails .subdates { padding-left: 0; }
+.task.subtask.blocked > .row .title { color: var(--muted); }
