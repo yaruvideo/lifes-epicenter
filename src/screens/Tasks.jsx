@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { save } from '../db.js';
+import { patch, save } from '../db.js';
 import { useItems, other, todayStr } from '../store.js';
 import { LISTS, isToday, isThisWeek, isBlocked, weekEnd } from '../tasks.js';
 import { PEOPLE } from '../config.js';
@@ -43,8 +43,36 @@ export default function Tasks({ me }) {
   };
   const [, , test] = filters.find((f) => f[0] === filter) || filters[0];
   const rank = { High: 0, Medium: 1, Low: 2 };
-  const shown = tasks.filter((t) => test(t) && (filter === 'done' || !t.done)).sort((a, b) =>
-    filter === 'done' ? (b.doneAt || 0) - (a.doneAt || 0) : (rank[a.priority] ?? 3) - (rank[b.priority] ?? 3) || (a.due || '9').localeCompare(b.due || '9'));
+  // Each list remembers how you sort it. "My order" is drag and drop; the order is saved on the tasks, so it syncs.
+  const sortBy = filter === 'done' ? 'recent' : (prefs.sortBy || {})[filter] || 'priority';
+  const setSort = (v) => save('prefs', { ...prefs, sortBy: { ...(prefs.sortBy || {}), [filter]: v } }, 'prefs-' + me);
+  const key = (t) => t.sortKey ?? t.created ?? 0;
+  const byDue = (a, b) => (a.due || '9').localeCompare(b.due || '9');
+  const sorters = {
+    priority: (a, b) => (rank[a.priority] ?? 3) - (rank[b.priority] ?? 3) || byDue(a, b),
+    due: (a, b) => byDue(a, b) || (rank[a.priority] ?? 3) - (rank[b.priority] ?? 3),
+    alpha: (a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base', numeric: true }),
+    mine: (a, b) => key(a) - key(b),
+    recent: (a, b) => (b.doneAt || 0) - (a.doneAt || 0)
+  };
+  const shown = tasks.filter((t) => test(t) && (filter === 'done' || !t.done)).sort(sorters[sortBy]);
+  const [drag, setDrag] = useState(null);
+  const dropDrag = () => {
+    if (drag && drag.over !== drag.id) {
+      const rest = shown.filter((t) => t.id !== drag.id);
+      const at = rest.findIndex((t) => t.id === drag.over) + (shown.findIndex((t) => t.id === drag.over) > shown.findIndex((t) => t.id === drag.id) ? 1 : 0);
+      const before = rest[at - 1], after = rest[at];
+      const k = before && after ? (key(before) + key(after)) / 2 : before ? key(before) + 1000 : key(after) - 1000;
+      patch(drag.id, { sortKey: k });
+    }
+    setDrag(null);
+  };
+  const handle = (t) => sortBy === 'mine' && (
+    <span className="draghandle" aria-hidden="true" title="Drag to reorder"
+      onPointerDown={(e) => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); setDrag({ id: t.id, over: t.id }); }}
+      onPointerMove={(e) => { if (!drag) return; const el = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-task-id]'); if (el && el.dataset.taskId !== drag.over) setDrag({ ...drag, over: el.dataset.taskId }); }}
+      onPointerUp={dropDrag} onPointerCancel={() => setDrag(null)}>⋮⋮</span>
+  );
   // Finished tasks stay in their list for a week, under a collapsible "Completed" heading.
   const weekAgo = Date.now() - 7 * 864e5;
   const recent = filter === 'done' ? [] : tasks.filter((t) => t.done && (t.doneAt || 0) > weekAgo && test(t)).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
@@ -66,8 +94,20 @@ export default function Tasks({ me }) {
         <button type="button" className="btn ghost small" onClick={() => setArranging(!arranging)}>{arranging ? 'Done arranging' : 'Rearrange lists'}</button>
       </div>
       <QuickAdd me={me} extra={listExtra} />
+      <div className="row" style={{ justifyContent: 'flex-end', marginBottom: -6 }}>
+        {filter !== 'done' && (
+          <label className="row sub" style={{ gap: 8, fontSize: 14 }}>Sort by
+            <select className="field" style={{ width: 'auto', minHeight: 36 }} value={sortBy} onChange={(e) => setSort(e.target.value)}>
+              <option value="priority">Priority</option>
+              <option value="due">Due date</option>
+              <option value="alpha">A to Z</option>
+              <option value="mine">My order (drag)</option>
+            </select>
+          </label>
+        )}
+      </div>
       <section className="card" aria-label="Task list">
-        {shown.length ? shown.map((t) => <TaskRow key={t.id} t={t} me={me} all={tasks} onCheck={onCheck} onOpen={onOpen} />) : <div className="empty">{recent.length ? 'All done here.' : 'Nothing here yet.'}</div>}
+        {shown.length ? shown.map((t) => <TaskRow key={t.id} t={t} me={me} all={tasks} onCheck={onCheck} onOpen={onOpen} handle={handle(t)} className={drag ? (drag.id === t.id ? ' dragging' : drag.over === t.id ? (shown.findIndex((x) => x.id === t.id) > shown.findIndex((x) => x.id === drag.id) ? ' dropbelow' : ' dropabove') : '') : ''} />) : <div className="empty">{recent.length ? 'All done here.' : 'Nothing here yet.'}</div>}
         {recent.length > 0 && (
           <>
             <button type="button" className="donehead" aria-expanded={showDone} onClick={() => save('prefs', { ...prefs, showCompleted: !showDone }, 'prefs-' + me)}>
