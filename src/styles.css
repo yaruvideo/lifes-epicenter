@@ -58,7 +58,7 @@ label.lbl { display: flex; flex-direction: column; gap: 6px; font-size: 13px; co
 .empty { color: var(--muted); padding: 8px 2px; }
 
 .modal-back { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: grid; place-items: center; padding: 16px; z-index: 10; }
-.modal { width: min(720px, 100%); max-height: 90vh; overflow-y: auto; background: var(--panel); border: 1px solid var(--border); border-radius: calc(var(--r) + 8px); padding: 22px; display: flex; flex-direction: column; gap: 14px; }
+.modal { width: min(960px, 100%); max-height: 90vh; overflow-y: auto; background: var(--panel); border: 1px solid var(--border); border-radius: calc(var(--r) + 8px); padding: 22px; display: flex; flex-direction: column; gap: 14px; }
 
 .themes { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
 .theme { text-align: left; display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: calc(var(--r) + 4px); background: var(--inner); border: 2px solid var(--border); cursor: pointer; }
@@ -89,3 +89,6 @@ label.lbl { display: flex; flex-direction: column; gap: 6px; font-size: 13px; co
 }
 .donehead { display: flex; align-items: center; gap: 8px; width: 100%; margin-top: 10px; padding: 10px 2px 6px; background: none; border: 0; border-top: 1px solid var(--border); color: var(--text); font: inherit; font-weight: 600; cursor: pointer; text-align: left; }
 .donehead .sub { font-weight: 400; }
+.task.subtask { flex-direction: column; align-items: stretch; gap: 8px; }
+.subdates { flex-wrap: wrap; gap: 12px; padding-left: 40px; }
+.subdates .lbl { flex: 1 1 200px; }
