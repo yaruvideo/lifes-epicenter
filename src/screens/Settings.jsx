@@ -3,6 +3,7 @@ import { exportBackup, importBackup } from '../db.js';
 import { useMe } from '../store.js';
 import { PEOPLE } from '../config.js';
 import { enablePush, pushEnabled } from '../push.js';
+import { refreshApp } from '../refresh.js';
 import { createHousehold, currentUser, getClient, householdId, joinHousehold, keys, onStatus, saveKeys, start, syncNow } from '../sync.js';
 
 export default function Settings() {
@@ -118,6 +119,10 @@ export default function Settings() {
         <div className="row">
           <button type="button" className="btn ghost" onClick={() => run(() => enablePush(me), 'Notifications are on for this device.')}>{pushEnabled() ? 'Re-connect notifications' : 'Turn on notifications'}</button>
           <span className="sub">Med times and task reminders arrive on this device, even when the app is closed. Do this once on each device (and again if you switch who uses it).</span>
+        </div>
+        <div className="row">
+          <button type="button" className="btn ghost" onClick={() => refreshApp()}>⟳ Refresh app</button>
+          <span className="sub">Syncs, picks up the newest version of the app, and reloads. On PC the button is also at the bottom of the sidebar, and F5 or Ctrl+R works too.</span>
         </div>
       </section>
 

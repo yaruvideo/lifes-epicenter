@@ -19,6 +19,7 @@ import Video from './screens/Video.jsx';
 import Client from './screens/Client.jsx';
 import { startReminders } from './reminders.js';
 import { device } from './db.js';
+import { refreshApp } from './refresh.js';
 
 const MAIN = [
   ['today', 'Today'], ['journal', 'Journal'], ['tasks', 'Tasks'],
@@ -33,6 +34,7 @@ const route = () => (location.hash.replace(/^#\/?/, '') || 'today');
 export default function App() {
   const [page, setPage] = useState(route);
   const [me] = useMe();
+  const [refreshing, setRefreshing] = useState(false);
   const [sync, setSync] = useState(null);
   const looks = useItems('look');
 
@@ -79,6 +81,7 @@ export default function App() {
         <div className="navgroup bottom">
           {link('appearance', 'Appearance')}
           {link('settings', 'Settings & sync')}
+          <button type="button" className="nav navbtn" disabled={refreshing} onClick={() => { setRefreshing(true); refreshApp(); }}>{refreshing ? 'Refreshing…' : '⟳ Refresh'}</button>
           {sync && <div className="syncpill" role="status">{sync.message}</div>}
         </div>
       </nav>
