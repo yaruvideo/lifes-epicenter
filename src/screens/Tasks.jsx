@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { patch, save } from '../db.js';
 import { useItems, other, todayStr } from '../store.js';
-import { priorityRank, useLists, saveLists, newListId, isToday, isThisWeek, isBlocked, weekEnd } from '../tasks.js';
+import { isWaiting, priorityRank, useLists, saveLists, newListId, isToday, isThisWeek, isBlocked, weekEnd } from '../tasks.js';
 import { PEOPLE } from '../config.js';
 import TaskRow from './TaskRow.jsx';
 import QuickAdd from './QuickAdd.jsx';
@@ -81,7 +81,7 @@ export default function Tasks({ me }) {
     mine: (a, b) => key(a) - key(b),
     recent: (a, b) => (b.doneAt || 0) - (a.doneAt || 0)
   };
-  const shown = tasks.filter((t) => test(t) && (filter === 'done' || !t.done)).sort(sorters[sortBy]);
+  const shown = tasks.filter((t) => test(t) && (filter === 'done' || !t.done) && (filter === 'repeat' || !isWaiting(t))).sort(sorters[sortBy]);
   const [drag, setDrag] = useState(null);
   const dropDrag = () => {
     if (drag && drag.over !== drag.id) {
@@ -108,7 +108,7 @@ export default function Tasks({ me }) {
   return (
     <>
       <header>
-        <div className="sub">{tasks.filter((t) => !t.done).length} open</div>
+        <div className="sub">{tasks.filter((t) => !t.done && !isWaiting(t)).length} open</div>
         <h1>Tasks</h1>
       </header>
       <div className="row">

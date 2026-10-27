@@ -38,7 +38,9 @@ function nextDue(due, repeat) {
   else if (repeat === 'weekdays') { do d.setDate(d.getDate() + 1); while (d.getDay() === 0 || d.getDay() === 6); }
   else if (repeat === 'weekly') d.setDate(d.getDate() + 7);
   else if (repeat === 'monthly') d.setMonth(d.getMonth() + 1);
-  return d.toISOString().slice(0, 10);
+  const next = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  // Finishing a late one doesn't bring it back today: keep stepping until the next round is after today.
+  return next <= todayStr() ? nextDue(next, repeat) : next;
 }
 
 export async function completeTask(t, me, outcome = '') {
@@ -46,7 +48,9 @@ export async function completeTask(t, me, outcome = '') {
   await save('journal', { type: 'task', text: outcome.trim(), title: t.title, list: t.list, taskId: t.id, by: me, at: Date.now() });
   if (t.repeat) {
     const { id, done, doneAt, doneBy, outcome: _o, ...rest } = t;
-    await save('task', { ...rest, due: nextDue(t.due, t.repeat), subtasks: cloneSubs(t.subtasks, true), created: Date.now() });
+    const due = nextDue(t.due, t.repeat);
+    // The next round stays out of sight until its day (showFrom), so a finished repeat doesn't reappear right away.
+    await save('task', { ...rest, due, showFrom: due, subtasks: cloneSubs(t.subtasks, true), created: Date.now() });
   }
 }
 
@@ -54,7 +58,8 @@ export const undoTask = (t) => patch(t.id, { done: false, doneAt: null, doneBy: 
 
 // A task waiting on another unfinished task stays off Today until that one is done.
 export const isBlocked = (t, all) => !!t.waitingOn && all.some((x) => x.id === t.waitingOn && !x.done);
-export const isToday = (t, all = []) => !t.done && !isBlocked(t, all) && (t.myDay || (t.due && t.due <= todayStr()));
+export const isWaiting = (t) => !t.done && !!t.showFrom && t.showFrom > todayStr();
+export const isToday = (t, all = []) => !t.done && !isBlocked(t, all) && !isWaiting(t) && (t.myDay || (t.due && t.due <= todayStr()));
 
 // "This Week" runs Monday to Sunday. Ticking "Show in This Week" stores that Sunday, so the flag clears itself next week.
 export const weekEnd = () => {
