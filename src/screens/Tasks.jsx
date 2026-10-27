@@ -25,7 +25,6 @@ export default function Tasks({ me }) {
     ['done', 'Done', (t) => t.done]
   ];
   const prefs = useItems('prefs').find((p) => p.id === 'prefs-' + me) || {};
-  const [arranging, setArranging] = useState(false);
   const [editing, setEditing] = useState(false);
   const [newList, setNewList] = useState('');
   const addList = (e) => {
@@ -105,26 +104,33 @@ export default function Tasks({ me }) {
       </header>
       <div className="row">
         <div className="seg" role="group" aria-label="Show">
-          {ordered.map(([id, label]) => arranging
-            ? <span key={id} className="row" style={{ gap: 2, padding: '0 4px' }}><button type="button" aria-label={'Move ' + label + ' left'} onClick={() => moveList(id, -1)}>‹</button><span style={{ fontSize: 14 }}>{label}</span><button type="button" aria-label={'Move ' + label + ' right'} onClick={() => moveList(id, 1)}>›</button></span>
-            : <button key={id} type="button" aria-pressed={filter === id} onClick={() => setFilter(id)}>{label}</button>)}
+          {ordered.map(([id, label]) => <button key={id} type="button" aria-pressed={filter === id} onClick={() => setFilter(id)}>{label}</button>)}
         </div>
-        <button type="button" className="btn ghost small" onClick={() => setArranging(!arranging)}>{arranging ? 'Done arranging' : 'Rearrange lists'}</button>
         <button type="button" className="btn ghost small" aria-expanded={editing} onClick={() => setEditing(!editing)}>{editing ? 'Done editing' : 'Edit lists'}</button>
       </div>
       {editing && (
         <section className="card" aria-labelledby="lists-h">
           <h2 id="lists-h">Your lists</h2>
-          {lists.map(([id, name]) => (
-            <div key={id + name} className="row" style={{ flexWrap: 'nowrap' }}>
-              <input className="field" style={{ flex: 1 }} defaultValue={name} aria-label={'Rename ' + name}
-                onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== name) saveLists(lists.map((l) => (l[0] === id ? [id, v] : l))); else e.target.value = name; }} />
-              <span className="sub" style={{ fontSize: 13, whiteSpace: 'nowrap' }}>{tasks.filter((t) => t.list === id && !t.done).length} open</span>
-              {id === 'inbox'
-                ? <span className="sub" style={{ fontSize: 13, width: 84, textAlign: 'center' }}>Always kept</span>
-                : <button type="button" className="btn ghost small" style={{ width: 84 }} onClick={() => removeList(id, name)}>Remove</button>}
-            </div>
-          ))}
+          <div className="sub" style={{ fontSize: 13 }}>Use the arrows to change the order of the tabs. Built-in views can be moved but not renamed or removed.</div>
+          {ordered.map(([id, label], i) => {
+            const own = lists.some((l) => l[0] === id);
+            return (
+              <div key={id + label} className="row" style={{ flexWrap: 'nowrap' }}>
+                <span className="row" style={{ gap: 4, flexWrap: 'nowrap' }}>
+                  <button type="button" className="btn ghost small" disabled={i === 0} aria-label={'Move ' + label + ' up'} onClick={() => moveList(id, -1)}>↑</button>
+                  <button type="button" className="btn ghost small" disabled={i === ordered.length - 1} aria-label={'Move ' + label + ' down'} onClick={() => moveList(id, 1)}>↓</button>
+                </span>
+                {own
+                  ? <input className="field" style={{ flex: 1 }} defaultValue={label} aria-label={'Rename ' + label}
+                      onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== label) saveLists(lists.map((l) => (l[0] === id ? [id, v] : l))); else e.target.value = label; }} />
+                  : <span style={{ flex: 1, padding: '0 12px' }}>{label}</span>}
+                {own && <span className="sub" style={{ fontSize: 13, whiteSpace: 'nowrap' }}>{tasks.filter((t) => t.list === id && !t.done).length} open</span>}
+                {!own ? <span className="sub" style={{ fontSize: 13, width: 84, textAlign: 'center' }}>Built-in</span>
+                  : id === 'inbox' ? <span className="sub" style={{ fontSize: 13, width: 84, textAlign: 'center' }}>Always kept</span>
+                  : <button type="button" className="btn ghost small" style={{ width: 84 }} onClick={() => removeList(id, label)}>Remove</button>}
+              </div>
+            );
+          })}
           <form className="row" onSubmit={addList}>
             <input className="field" style={{ flex: 1 }} value={newList} onChange={(e) => setNewList(e.target.value)} placeholder="New list name" aria-label="New list name" />
             <button className="btn small" type="submit">Add list</button>
