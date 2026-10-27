@@ -41,7 +41,7 @@ function Details({ v, me }) {
           {list.map((c) => (
             <div key={c.id} className={'task' + (c.done ? ' isdone' : '')}>
               <button type="button" className={'check' + (c.done ? ' done' : '')} aria-label={(c.done ? 'Uncheck ' : 'Check ') + c.text} onClick={() => setList(list.map((x) => (x.id === c.id ? { ...x, done: !x.done } : x)))}>{c.done ? '✓' : ''}</button>
-              <span className="title" style={{ cursor: 'default' }}>{c.text}</span>
+              <Live className="title" style={{ cursor: 'text', border: 0, background: 'transparent', minWidth: 0 }} value={c.text} onSave={(val) => val.trim() && setList(list.map((x) => (x.id === c.id ? { ...x, text: val.trim() } : x)))} aria-label={'Edit ' + c.text} />
               <button type="button" className="btn ghost small" aria-label={'Remove ' + c.text} onClick={() => setList(list.filter((x) => x.id !== c.id))}>✕</button>
             </div>
           ))}

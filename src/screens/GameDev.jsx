@@ -116,6 +116,8 @@ export default function GameDev({ me }) {
                       <div className="row between">
                         <span className="sub" style={{ fontSize: 12 }}>{[c.tag, c.due && 'Due ' + c.due].filter(Boolean).join(' · ')}</span>
                         <span className="row" style={{ gap: 4 }}>
+                          <button type="button" className="btn ghost small" style={{ minHeight: 28, padding: '0 8px' }} aria-label={'Edit ' + c.title} title="Edit" onClick={() => setOpenId(c.id)}>✎</button>
+                          <button type="button" className="btn ghost small" style={{ minHeight: 28, padding: '0 8px' }} aria-label={'Delete ' + c.title} title="Delete" onClick={() => { if (confirm('Delete "' + c.title + '"?')) remove(c.id); }}>✕</button>
                           {ci > 0 && <button type="button" className="btn ghost small" style={{ minHeight: 28, padding: '0 8px' }} aria-label={'Move ' + c.title + ' left'} onClick={() => move(c, -1)}>‹</button>}
                           {ci < COLUMNS.length - 1 && <button type="button" className="btn ghost small" style={{ minHeight: 28, padding: '0 8px' }} aria-label={'Move ' + c.title + ' right'} onClick={() => move(c, 1)}>›</button>}
                         </span>
