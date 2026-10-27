@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { save, remove } from '../db.js';
 import { useItems, ownerLabel } from '../store.js';
-import { listName } from '../tasks.js';
+import { listName, useLists } from '../tasks.js';
 
 // The day as a timeline: finished tasks (with their outcome notes) and quick thoughts.
 export default function Journal({ me }) {
   const entries = useItems('journal');
+  const lists = useLists();
   const [text, setText] = useState('');
   const [kind, setKind] = useState('all');
   const add = (e) => {
@@ -48,7 +49,7 @@ export default function Journal({ me }) {
                   : x.type === 'prompt'
                   ? <><span className="chip" style={{ background: 'var(--accent)', color: 'var(--on-accent)' }}>Morning prompt</span> <b>{x.prompt}</b><div style={{ marginTop: 6, whiteSpace: 'pre-wrap' }}>{x.text}</div></>
                   : x.type === 'task'
-                  ? <><span className="chip" style={{ background: 'var(--hi)', color: 'var(--on-accent)' }}>Task done</span> <b>{x.title}</b> <span className="sub">· {listName(x.list)}</span>{x.text && <div style={{ marginTop: 6 }}>{x.text}</div>}</>
+                  ? <><span className="chip" style={{ background: 'var(--hi)', color: 'var(--on-accent)' }}>Task done</span> <b>{x.title}</b> <span className="sub">· {listName(x.list, lists)}</span>{x.text && <div style={{ marginTop: 6 }}>{x.text}</div>}</>
                   : <div style={{ whiteSpace: 'pre-wrap' }}>{x.text}</div>}
                 <div className="sub" style={{ fontSize: 12, marginTop: 4 }}>{ownerLabel(x.by, me)}</div>
               </div>

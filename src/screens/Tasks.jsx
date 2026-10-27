@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { patch, save } from '../db.js';
 import { useItems, other, todayStr } from '../store.js';
-import { LISTS, isToday, isThisWeek, isBlocked, weekEnd } from '../tasks.js';
+import { useLists, saveLists, newListId, isToday, isThisWeek, isBlocked, weekEnd } from '../tasks.js';
 import { PEOPLE } from '../config.js';
 import TaskRow from './TaskRow.jsx';
 import QuickAdd from './QuickAdd.jsx';
@@ -9,6 +9,7 @@ import useTaskActions from './useTaskActions.jsx';
 
 export default function Tasks({ me }) {
   const tasks = useItems('task');
+  const lists = useLists();
   const [filter, setFilter] = useState('all');
   const { onCheck, onOpen, overlays } = useTaskActions(me);
   // Each list's test ignores done/not-done; open tasks and the "Completed" section both use it.
@@ -20,11 +21,28 @@ export default function Tasks({ me }) {
     ['theirs', PEOPLE[other(me)].name, (t) => t.owner === other(me)],
     ['both', 'Together', (t) => t.owner === 'both'],
     ['repeat', 'Repeating', (t) => !!t.repeat],
-    ...LISTS.map(([id, n]) => [id, n, (t) => t.list === id]),
+    ...lists.map(([id, n]) => [id, n, (t) => t.list === id]),
     ['done', 'Done', (t) => t.done]
   ];
   const prefs = useItems('prefs').find((p) => p.id === 'prefs-' + me) || {};
   const [arranging, setArranging] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [newList, setNewList] = useState('');
+  const addList = (e) => {
+    e.preventDefault();
+    const name = newList.trim();
+    if (!name) return;
+    saveLists([...lists, [newListId(name, lists), name]]);
+    setNewList('');
+  };
+  // Removing a list never loses tasks: anything in it (done or not) moves to the Inbox.
+  const removeList = async (id, name) => {
+    const inIt = tasks.filter((t) => t.list === id);
+    if (!confirm('Remove the "' + name + '" list?' + (inIt.length ? ' Its ' + inIt.length + ' task(s) will move to the Inbox.' : ''))) return;
+    for (const t of inIt) await patch(t.id, { list: 'inbox' });
+    await saveLists(lists.filter((l) => l[0] !== id));
+    if (filter === id) setFilter('all');
+  };
   const order = prefs.listOrder || [];
   // A list added after you arranged yours slots in right after the list it follows by default.
   const pos = (id) => {
@@ -77,7 +95,7 @@ export default function Tasks({ me }) {
   const weekAgo = Date.now() - 7 * 864e5;
   const recent = filter === 'done' ? [] : tasks.filter((t) => t.done && (t.doneAt || 0) > weekAgo && test(t)).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
   const showDone = prefs.showCompleted !== false;
-  const listExtra = LISTS.some((l) => l[0] === filter) ? { list: filter } : filter === 'week' ? { thisWeek: weekEnd() } : filter === 'myday' ? { myDay: true } : {};
+  const listExtra = lists.some((l) => l[0] === filter) ? { list: filter } : filter === 'week' ? { thisWeek: weekEnd() } : filter === 'myday' ? { myDay: true } : {};
 
   return (
     <>
@@ -92,7 +110,27 @@ export default function Tasks({ me }) {
             : <button key={id} type="button" aria-pressed={filter === id} onClick={() => setFilter(id)}>{label}</button>)}
         </div>
         <button type="button" className="btn ghost small" onClick={() => setArranging(!arranging)}>{arranging ? 'Done arranging' : 'Rearrange lists'}</button>
+        <button type="button" className="btn ghost small" aria-expanded={editing} onClick={() => setEditing(!editing)}>{editing ? 'Done editing' : 'Edit lists'}</button>
       </div>
+      {editing && (
+        <section className="card" aria-labelledby="lists-h">
+          <h2 id="lists-h">Your lists</h2>
+          {lists.map(([id, name]) => (
+            <div key={id + name} className="row" style={{ flexWrap: 'nowrap' }}>
+              <input className="field" style={{ flex: 1 }} defaultValue={name} aria-label={'Rename ' + name}
+                onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== name) saveLists(lists.map((l) => (l[0] === id ? [id, v] : l))); else e.target.value = name; }} />
+              <span className="sub" style={{ fontSize: 13, whiteSpace: 'nowrap' }}>{tasks.filter((t) => t.list === id && !t.done).length} open</span>
+              {id === 'inbox'
+                ? <span className="sub" style={{ fontSize: 13, width: 84, textAlign: 'center' }}>Always kept</span>
+                : <button type="button" className="btn ghost small" style={{ width: 84 }} onClick={() => removeList(id, name)}>Remove</button>}
+            </div>
+          ))}
+          <form className="row" onSubmit={addList}>
+            <input className="field" style={{ flex: 1 }} value={newList} onChange={(e) => setNewList(e.target.value)} placeholder="New list name" aria-label="New list name" />
+            <button className="btn small" type="submit">Add list</button>
+          </form>
+        </section>
+      )}
       <QuickAdd me={me} extra={listExtra} />
       <div className="row" style={{ justifyContent: 'flex-end', marginBottom: -6 }}>
         {filter !== 'done' && (

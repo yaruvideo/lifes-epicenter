@@ -1,8 +1,20 @@
 import { newId, patch, save } from './db.js';
-import { todayStr } from './store.js';
+import { todayStr, useItems } from './store.js';
 
 export const LISTS = [['inbox', 'Inbox'], ['health', 'Health'], ['client', 'Client Work'], ['video', 'Video Projects'], ['gamedev', 'Game Dev'], ['home', 'Home']];
-export const listName = (id) => (LISTS.find((l) => l[0] === id) || [id, id])[1];
+// Your task lists are shared data (one 'tasklists' item), so either of you can add, rename or remove them. LISTS is the starting set.
+export function useLists() {
+  const rec = useItems('tasklists').find((r) => r.id === 'tasklists');
+  return rec?.lists || LISTS;
+}
+export const newListId = (name, lists) => {
+  const base = 'list-' + (name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'new');
+  let id = base, n = 2;
+  while (lists.some((l) => l[0] === id)) id = base + '-' + n++;
+  return id;
+};
+export const saveLists = (lists) => save('tasklists', { lists }, 'tasklists');
+export const listName = (id, lists = LISTS) => (lists.find((l) => l[0] === id) || [id, id])[1];
 // Every task asks "what got done?" when it's ticked. The note (optional) goes to the Journal.
 
 export const PRIORITY = { High: { background: 'var(--warm)', color: 'var(--on-accent)' }, Medium: { background: 'var(--inner)', color: 'var(--warm)', border: '1px solid var(--warm)' }, Low: { background: 'var(--inner)', color: 'var(--muted)', border: '1px solid var(--border)' } };

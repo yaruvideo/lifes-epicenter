@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { newId, patch, remove, save } from '../db.js';
 import { useItems, todayStr } from '../store.js';
-import { LISTS, weekEnd, updateSub } from '../tasks.js';
+import { useLists, weekEnd, updateSub } from '../tasks.js';
 import SubtaskItem from './SubtaskItem.jsx';
 import { PEOPLE } from '../config.js';
 import { other } from '../store.js';
@@ -10,6 +10,7 @@ export default function TaskModal({ task, me, onClose }) {
   const [t, setT] = useState(task);
   const [newSub, setNewSub] = useState('');
   const allTasks = useItems('task');
+  const lists = useLists();
   const others = allTasks.filter((x) => x.id !== task.id && !x.done);
   const ref = useRef(null);
   useEffect(() => { ref.current?.focus(); }, []);
@@ -41,7 +42,7 @@ export default function TaskModal({ task, me, onClose }) {
           </label>
           <label className="lbl">List
             <select className="field" value={t.list} onChange={(e) => set({ list: e.target.value })}>
-              {LISTS.map(([id, n]) => <option key={id} value={id}>{n}</option>)}
+              {lists.map(([id, n]) => <option key={id} value={id}>{n}</option>)}
             </select>
           </label>
           <label className="lbl">Due
