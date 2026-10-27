@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { newId, patch, remove, save } from '../db.js';
 import { useItems } from '../store.js';
 import Live from './Live.jsx';
+import SectionInbox from './SectionInbox.jsx';
 
 const STAGES = ['Idea', 'Script', 'Record', 'Edit', 'Publish'];
 const TEMPLATES = {
@@ -112,6 +113,7 @@ export default function Video({ me }) {
         {showDone && done.map(row)}
       </section>
       {sel && <Details key={sel.id} v={sel} me={me} />}
+      <SectionInbox me={me} listId="video" />
       {picker && (
         <div className="modal-back" onClick={(e) => e.target === e.currentTarget && setPicker(false)}>
           <div className="modal" role="dialog" aria-modal="true" aria-label="Start a video from a template">

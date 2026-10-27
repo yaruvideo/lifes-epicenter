@@ -3,6 +3,7 @@ import { patch, remove, save } from '../db.js';
 import { device } from '../db.js';
 import { useItems, todayStr } from '../store.js';
 import Live from './Live.jsx';
+import SectionInbox from './SectionInbox.jsx';
 
 const STAGES = ['Brief', 'In progress', 'Review', 'Revisions', 'Delivered'];
 const INVOICE = ['Draft', 'Sent', 'Paid'];
@@ -87,6 +88,8 @@ export default function Client({ me }) {
           </div>
         )}
       </section>
+
+      <SectionInbox me={me} listId="client" />
 
       <div className="row between">
         <h2>Per client</h2>
