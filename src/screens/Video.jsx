@@ -4,6 +4,9 @@ import { useItems } from '../store.js';
 import Live from './Live.jsx';
 import SectionInbox from './SectionInbox.jsx';
 import useDragSort, { sortKeyOf } from './useDragSort.jsx';
+import StepRow from './StepRow.jsx';
+import OrderEditor from './OrderEditor.jsx';
+import { usePageTabs } from '../projectlinks.js';
 import { DEFAULT_TEMPLATES, VIDEO_STAGES, fromTemplate, saveTemplates, useTemplates } from '../projects.js';
 
 // Each video carries its own steps (v.stages) so its layout can change after a template is applied.
@@ -38,18 +41,12 @@ function Details({ v, me }) {
       <div className="row" style={{ alignItems: 'flex-start', gap: 20 }}>
         <div style={{ flex: '1 1 300px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
           <h3 className="display" style={{ margin: 0, fontSize: 17 }}>{v.stage} checklist</h3>
-          {list.map((c) => (
-            <div key={c.id} className={'task' + (c.done ? ' isdone' : '')}>
-              <button type="button" className={'check' + (c.done ? ' done' : '')} aria-label={(c.done ? 'Uncheck ' : 'Check ') + c.text} onClick={() => setList(list.map((x) => (x.id === c.id ? { ...x, done: !x.done } : x)))}>{c.done ? '✓' : ''}</button>
-              <Live className="title" style={{ cursor: 'text', border: 0, background: 'transparent', minWidth: 0 }} value={c.text} onSave={(val) => val.trim() && setList(list.map((x) => (x.id === c.id ? { ...x, text: val.trim() } : x)))} aria-label={'Edit ' + c.text} />
-              <button type="button" className="btn ghost small" aria-label={'Remove ' + c.text} onClick={() => setList(list.filter((x) => x.id !== c.id))}>✕</button>
-            </div>
-          ))}
+          {list.map((c) => <StepRow key={c.id} parent={v} item={c} me={me} onRemove={() => setList(list.filter((x) => x.id !== c.id))} />)}
           <form className="row" onSubmit={(e) => { e.preventDefault(); if (newItem.trim()) { setList([...list, { id: newId(), text: newItem.trim(), done: false }]); setNewItem(''); } }}>
             <input className="field" style={{ flex: 1 }} value={newItem} onChange={(e) => setNewItem(e.target.value)} placeholder="Add a checklist item" aria-label="New checklist item" />
             <button className="btn small" type="submit">Add</button>
           </form>
-          <div className="sub" style={{ fontSize: 12 }}>Each stage has its own checklist from the template. Jump to any stage by clicking it in the strip above.</div>
+          <div className="sub" style={{ fontSize: 12 }}>Each stage has its own checklist. Give a step a due date and it also shows on Today and in Tasks.</div>
         </div>
         <div style={{ flex: '1 1 300px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
           <h3 className="display" style={{ margin: 0, fontSize: 17 }}>Script &amp; notes</h3>
@@ -62,6 +59,7 @@ function Details({ v, me }) {
           </div>
         </div>
       </div>
+      <SectionInbox key={'vt-' + v.id} me={me} listId="video" title="To-dos for this video" match={(t) => t.project === v.id && !t.stepRef} extra={{ project: v.id }} hideProject empty="Nothing yet. To-dos you add here, or link to this video from any task's Project box, show here and on Today when they're due." />
       {editSteps && <StepsEditor v={v} set={set} />}
       <div className="row">
         <button type="button" className="btn ghost small" aria-expanded={editSteps} onClick={() => setEditSteps(!editSteps)}>{editSteps ? 'Done editing steps' : '✎ Edit steps'}</button>
@@ -132,6 +130,100 @@ function Strip({ v, onStage }) {
   );
 }
 
+const VIDEO_TABS = [['pipeline', 'Pipeline'], ['board', 'Board'], ['list', 'List'], ['timeline', 'Timeline'], ['inbox', 'Inbox'], ['todos', 'To-dos']];
+const day = 864e5;
+const shortDate = (d) => new Date(d + 'T12:00').toLocaleDateString([], { month: 'short', day: 'numeric' });
+
+// Kanban: one column per step name (the usual five, plus any custom ones), each video a card. Drag to change step.
+function VideoBoard({ videos, sel, onSelect }) {
+  const [dragId, setDragId] = useState(null);
+  const cols = [...VIDEO_STAGES, ...new Set(videos.flatMap(stagesOf).filter((s) => !VIDEO_STAGES.includes(s)))];
+  const moveTo = (v, stage) => {
+    if (!stagesOf(v).includes(stage)) return alert('"' + v.title + '" doesn\'t have a "' + stage + '" step. Add it with Edit steps first.');
+    patch(v.id, { stage });
+  };
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols.length}, minmax(200px, 1fr))`, gap: 12, minWidth: cols.length * 212 }}>
+        {cols.map((c) => {
+          const list = videos.filter((v) => v.stage === c);
+          return (
+            <section key={c} className="card" aria-label={c} style={{ padding: 12, minHeight: 260 }}
+              onDragOver={(e) => e.preventDefault()} onDrop={() => { const v = videos.find((x) => x.id === dragId); if (v) moveTo(v, c); setDragId(null); }}>
+              <div className="row between"><h2 style={{ fontSize: 16 }}>{c}</h2><span className="sub">{list.length}</span></div>
+              {list.map((v) => {
+                const l = Object.values(v.checklist || {}).flat();
+                return (
+                  <button key={v.id} type="button" draggable onDragStart={() => setDragId(v.id)} onClick={() => onSelect(v.id)} className="note"
+                    style={{ padding: 10, cursor: 'grab', textAlign: 'left', color: 'inherit', font: 'inherit', display: 'flex', flexDirection: 'column', gap: 4, outline: sel?.id === v.id ? '2px solid #F2545B' : 'none' }}>
+                    <b>{v.title}</b>
+                    <span className="sub" style={{ fontSize: 12 }}>{[v.series || templateLabel(v), v.publishDate && 'Publish ' + shortDate(v.publishDate), l.length && l.filter((x) => x.done).length + '/' + l.length + ' steps'].filter(Boolean).join(' · ')}</span>
+                  </button>
+                );
+              })}
+            </section>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function VideoList({ videos, onSelect }) {
+  const [[sk, dir], setSort] = useState(['publish', 1]);
+  const val = { title: (v) => v.title.toLowerCase(), step: stageRank, progress, publish: (v) => v.publishDate || '9999', series: (v) => (v.series || '~').toLowerCase() };
+  const rows = [...videos].sort((a, b) => { const x = val[sk](a), y = val[sk](b); return (x < y ? -1 : x > y ? 1 : 0) * dir; });
+  const cols = [['title', 'Video'], ['step', 'Step'], ['progress', 'Checklist'], ['publish', 'Publish'], ['series', 'Series']];
+  return (
+    <section className="card" style={{ overflowX: 'auto' }}>
+      <table className="tbl" style={{ minWidth: 560 }}>
+        <thead><tr>{cols.map(([k, l]) => (
+          <th key={k} style={{ textAlign: 'left' }} aria-sort={sk === k ? (dir > 0 ? 'ascending' : 'descending') : 'none'}>
+            <button type="button" onClick={() => setSort(sk === k ? [k, -dir] : [k, 1])}>{l}{sk === k ? (dir > 0 ? ' ▲' : ' ▼') : ''}</button>
+          </th>
+        ))}</tr></thead>
+        <tbody>{rows.map((v) => (
+          <tr key={v.id}>
+            <td><button type="button" className="linkish" style={{ fontWeight: 600, color: 'inherit' }} onClick={() => onSelect(v.id)}>{v.title}</button></td>
+            <td style={{ textAlign: 'left' }}>{v.stage}</td>
+            <td style={{ textAlign: 'left' }}>{Math.round(progress(v) * 100)}%</td>
+            <td style={{ textAlign: 'left' }}>{v.publishDate ? shortDate(v.publishDate) : ''}</td>
+            <td style={{ textAlign: 'left' }}>{v.series || ''}</td>
+          </tr>
+        ))}</tbody>
+      </table>
+      {!videos.length && <div className="empty">No videos in progress.</div>}
+    </section>
+  );
+}
+
+// Six weeks from the start of this week, each video placed at its publish date.
+function VideoTimeline({ videos, onSelect }) {
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  const w0 = new Date(now - now.getDay() * day);
+  const weeks = [...Array(6)].map((_, i) => new Date(+w0 + i * 7 * day));
+  const at = (d) => new Date(d + 'T00:00');
+  const col = (d) => Math.floor((at(d) - w0) / (7 * day));
+  const dated = videos.filter((v) => v.publishDate && col(v.publishDate) >= 0 && col(v.publishDate) < 6).sort((a, b) => a.publishDate.localeCompare(b.publishDate));
+  const undated = videos.filter((v) => !v.publishDate);
+  const grid = { display: 'grid', gridTemplateColumns: '220px repeat(6, minmax(0, 1fr))', alignItems: 'center', minHeight: 40 };
+  return (
+    <section className="card" style={{ overflowX: 'auto' }}>
+      <div style={{ minWidth: 820, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ ...grid, minHeight: 0, fontSize: 12, fontWeight: 600, color: 'var(--muted)' }}><span />{weeks.map((w) => <span key={+w}>{w.toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>)}</div>
+        {!dated.length && <div className="empty">Set a publish date on a video to see it here.</div>}
+        {dated.map((v) => (
+          <div key={v.id} style={grid}>
+            <button type="button" className="linkish" style={{ fontWeight: 500, paddingRight: 12, color: 'inherit' }} onClick={() => onSelect(v.id)}>{v.title}</button>
+            <span style={{ gridColumn: (col(v.publishDate) + 2) + ' / span 1', height: 28, borderRadius: 8, background: '#F2545B', color: '#fff', fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', padding: '0 10px', marginRight: 4 }}>{v.stage} · {shortDate(v.publishDate)}</span>
+          </div>
+        ))}
+        {undated.length > 0 && <div className="sub" style={{ fontSize: 13 }}>No publish date yet: {undated.map((v) => v.title).join(', ')}</div>}
+      </div>
+    </section>
+  );
+}
+
 export default function Video({ me }) {
   const videos = useItems('video');
   const [selId, setSelId] = useState(null);
@@ -159,6 +251,11 @@ export default function Video({ me }) {
   const done = videos.filter((v) => v.done).sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0));
   const sel = videos.find((v) => v.id === selId) || active[0];
   const templates = useTemplates('video');
+  const [tabs, saveTabs] = usePageTabs('video', VIDEO_TABS);
+  const visible = tabs.filter((t) => !t.hidden);
+  const [viewPick, setView] = useState(null);
+  const view = visible.some((t) => t.id === viewPick) ? viewPick : visible[0]?.id;
+  const [editTabs, setEditTabs] = useState(false);
   // t is a template, or null for a blank project with the usual five steps and empty checklists.
   const create = (t) => {
     const { stages, checklist } = fromTemplate(t, VIDEO_STAGES);
@@ -181,27 +278,40 @@ export default function Video({ me }) {
         <div><div className="sub row" style={{ gap: 8 }}><span className="dot" style={{ background: '#F2545B' }} />Section</div><h1>Video Projects</h1></div>
         <button type="button" className="btn vid" onClick={() => setPicker(true)}>+ New video</button>
       </header>
+      <div className="row" style={{ gap: 8 }}>
+        <div className="seg" role="tablist" aria-label="View">
+          {visible.map((t) => <button key={t.id} type="button" role="tab" aria-selected={view === t.id} aria-pressed={view === t.id} onClick={() => setView(t.id)}>{t.name}{t.id === 'inbox' && parked.length ? ' (' + parked.length + ')' : ''}</button>)}
+        </div>
+        <button type="button" className="btn ghost small" aria-expanded={editTabs} onClick={() => setEditTabs(!editTabs)}>Edit tabs</button>
+      </div>
+      {editTabs && <OrderEditor title="Tabs for Video Projects" hint="Drag the ⋮⋮ handle to change the order, or hide tabs you don't use. The first tab opens by default." items={tabs} hide onChange={saveTabs} onDone={() => setEditTabs(false)} />}
+      {view === 'pipeline' && (
       <section aria-label="Projects" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {active.length > 1 && (
-          <label className="row sub" style={{ gap: 8, fontSize: 14, alignSelf: 'flex-end' }}>Sort by
-            <select className="field" style={{ width: 'auto', minHeight: 36 }} value={sortBy} onChange={(e) => setSort(e.target.value)}>
-              <option value="date">Publish date (soonest first)</option>
-              <option value="stage">Current step (furthest along first)</option>
-              <option value="stageUp">Current step (just started first)</option>
-              <option value="mine">My order (drag)</option>
-              <option value="progress">Checklist progress (most done first)</option>
-              <option value="series">Series</option>
-              <option value="alpha">A to Z</option>
-              <option value="newest">Newest first</option>
-            </select>
-          </label>
-        )}
-        {active.length === 0 && <div className="empty">No videos in progress. Start one from a template.</div>}
-        {active.map(row)}
-        {done.length > 0 && <button type="button" className="btn ghost small" style={{ alignSelf: 'flex-start' }} onClick={() => setShowDone(!showDone)}>{showDone ? 'Hide' : 'Show'} published ({done.length})</button>}
-        {showDone && done.map(row)}
-      </section>
-      {sel && <Details key={sel.id} v={sel} me={me} />}
+          {active.length > 1 && (
+            <label className="row sub" style={{ gap: 8, fontSize: 14, alignSelf: 'flex-end' }}>Sort by
+              <select className="field" style={{ width: 'auto', minHeight: 36 }} value={sortBy} onChange={(e) => setSort(e.target.value)}>
+                <option value="date">Publish date (soonest first)</option>
+                <option value="stage">Current step (furthest along first)</option>
+                <option value="stageUp">Current step (just started first)</option>
+                <option value="mine">My order (drag)</option>
+                <option value="progress">Checklist progress (most done first)</option>
+                <option value="series">Series</option>
+                <option value="alpha">A to Z</option>
+                <option value="newest">Newest first</option>
+              </select>
+            </label>
+          )}
+          {active.length === 0 && <div className="empty">No videos in progress. Start one from a template.</div>}
+          {active.map(row)}
+          {done.length > 0 && <button type="button" className="btn ghost small" style={{ alignSelf: 'flex-start' }} onClick={() => setShowDone(!showDone)}>{showDone ? 'Hide' : 'Show'} published ({done.length})</button>}
+          {showDone && done.map(row)}
+        </section>
+      )}
+      {view === 'board' && <VideoBoard videos={active} sel={sel} onSelect={setSelId} />}
+      {view === 'list' && <VideoList videos={active} onSelect={setSelId} />}
+      {view === 'timeline' && <VideoTimeline videos={active} onSelect={setSelId} />}
+      {sel && view !== 'todos' && <Details key={sel.id} v={sel} me={me} />}
+      {view === 'inbox' && (
       <section className="card" aria-labelledby="vinbox-h">
         <h2 id="vinbox-h">Inbox <span className="sub" style={{ fontSize: 14, fontWeight: 400 }}>on hold · {parked.length}</span></h2>
         {parked.length === 0 && <div className="empty">Videos you put on hold or postpone land here. Use "Move to Inbox" under a video's details.</div>}
@@ -216,7 +326,8 @@ export default function Video({ me }) {
           </div>
         ))}
       </section>
-      <SectionInbox me={me} listId="video" />
+      )}
+      {view === 'todos' && <SectionInbox me={me} listId="video" title="Loose to-dos" match={(t) => !t.project} />}
       {picker && (
         <div className="modal-back" onClick={(e) => e.target === e.currentTarget && setPicker(false)}>
           <div className="modal" role="dialog" aria-modal="true" aria-label="Start a new video">

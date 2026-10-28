@@ -3,6 +3,7 @@ import { applyLook, DEFAULT_LOOK } from './themes.js';
 import { useItems, useMe } from './store.js';
 import { onStatus, start } from './sync.js';
 import { PEOPLE, PREVIEW } from './config.js';
+import { ProjectsProvider } from './projectlinks.js';
 import Today from './screens/Today.jsx';
 import Tasks from './screens/Tasks.jsx';
 import Journal from './screens/Journal.jsx';
@@ -72,6 +73,7 @@ export default function App() {
   else screen = <Soon name={NAMES[page] || 'This page'} />;
 
   return (
+    <ProjectsProvider>
     <div className="shell">
       <nav className="side" aria-label="Main">
         <div className="brand"><div className="logo">E</div>Life's Epicenter</div>
@@ -92,5 +94,6 @@ export default function App() {
         ))}
       </nav>
     </div>
+    </ProjectsProvider>
   );
 }

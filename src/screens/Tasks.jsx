@@ -6,11 +6,15 @@ import { PEOPLE } from '../config.js';
 import TaskRow from './TaskRow.jsx';
 import QuickAdd from './QuickAdd.jsx';
 import useTaskActions from './useTaskActions.jsx';
+import { projectOf, useProjects } from '../projectlinks.js';
 
 export default function Tasks({ me }) {
   const tasks = useItems('task');
   const lists = useLists();
   const [filter, setFilter] = useState('all');
+  const [projectFilter, setProjectFilter] = useState('');
+  const { open: openProjects, byId: projectById } = useProjects();
+  const inProjectFilter = (t) => !projectFilter || (projectFilter === 'none' ? !projectOf(t) : projectOf(t) === projectFilter);
   const { onCheck, onOpen, overlays } = useTaskActions(me);
   // Each list's test ignores done/not-done; open tasks and the "Completed" section both use it.
   const filters = [
@@ -81,7 +85,7 @@ export default function Tasks({ me }) {
     mine: (a, b) => key(a) - key(b),
     recent: (a, b) => (b.doneAt || 0) - (a.doneAt || 0)
   };
-  const shown = tasks.filter((t) => test(t) && (filter === 'done' || !t.done) && (filter === 'repeat' || !isWaiting(t))).sort(sorters[sortBy]);
+  const shown = tasks.filter((t) => test(t) && inProjectFilter(t) && (filter === 'done' || !t.done) && (filter === 'repeat' || !isWaiting(t))).sort(sorters[sortBy]);
   const [drag, setDrag] = useState(null);
   const dropDrag = () => {
     if (drag && drag.over !== drag.id) {
@@ -101,7 +105,7 @@ export default function Tasks({ me }) {
   );
   // Finished tasks stay in their list for a week, under a collapsible "Completed" heading.
   const weekAgo = Date.now() - 7 * 864e5;
-  const recent = filter === 'done' ? [] : tasks.filter((t) => t.done && (t.doneAt || 0) > weekAgo && test(t)).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
+  const recent = filter === 'done' ? [] : tasks.filter((t) => t.done && (t.doneAt || 0) > weekAgo && test(t) && inProjectFilter(t)).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
   const showDone = prefs.showCompleted !== false;
   const listExtra = lists.some((l) => l[0] === filter) ? { list: filter } : filter === 'week' ? { thisWeek: weekEnd() } : filter === 'myday' ? { myDay: true } : {};
 
@@ -152,6 +156,16 @@ export default function Tasks({ me }) {
       )}
       <QuickAdd me={me} extra={listExtra} />
       <div className="row" style={{ justifyContent: 'flex-end', marginBottom: -6 }}>
+        <label className="row sub" style={{ gap: 8, fontSize: 14 }}>Project
+          <select className="field" style={{ width: 'auto', minHeight: 36, maxWidth: 240 }} value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)}>
+            <option value="">All projects</option>
+            <option value="none">No project</option>
+            {['Game Dev', 'Video Projects', 'Client Work'].map((g) => openProjects.some((p) => p.group === g) && (
+              <optgroup key={g} label={g}>{openProjects.filter((p) => p.group === g).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</optgroup>
+            ))}
+            {projectFilter && projectFilter !== 'none' && !openProjects.some((p) => p.id === projectFilter) && projectById[projectFilter] && <option value={projectFilter}>{projectById[projectFilter].name}</option>}
+          </select>
+        </label>
         {filter !== 'done' && (
           <label className="row sub" style={{ gap: 8, fontSize: 14 }}>Sort by
             <select className="field" style={{ width: 'auto', minHeight: 36 }} value={sortBy} onChange={(e) => setSort(e.target.value)}>

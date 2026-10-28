@@ -10,11 +10,11 @@ import useTaskActions from './useTaskActions.jsx';
 // The loose to-dos for a section (Video Projects, Client Work): the open tasks in that task list,
 // shown under the section's own pages. Same tasks as on the Tasks page, so ticking one here ticks it there.
 // `match` narrows it further (Game Dev shows one project's tasks) and `extra` is stamped on new ones.
-export default function SectionInbox({ me, listId, title = 'To-dos', match = () => true, extra = {} }) {
+export default function SectionInbox({ me, listId, title = 'To-dos', match = () => true, extra = {}, hideProject = false, empty = 'Nothing here. Loose to-dos for this section land here, and they also show in this list on the Tasks page.' }) {
   const tasks = useItems('task');
   const prefs = useItems('prefs').find((p) => p.id === 'prefs-' + me) || {};
   const { onCheck, onOpen, overlays } = useTaskActions(me);
-  const prefKey = 'section-' + listId + (extra.project ? '-' + extra.project : '');
+  const prefKey = 'section-' + listId + (extra.project ? '-p' : '');
   const sortBy = (prefs.sortBy || {})[prefKey] || 'mine';
   const setSort = (v) => save('prefs', { ...prefs, sortBy: { ...(prefs.sortBy || {}), [prefKey]: v } }, 'prefs-' + me);
   const key = sortKeyOf;
@@ -47,14 +47,14 @@ export default function SectionInbox({ me, listId, title = 'To-dos', match = () 
         </label>
       </div>
       <QuickAdd me={me} extra={{ list: listId, ...extra }} placeholder="Add a to-do…" />
-      {shown.length ? shown.map((t) => <TaskRow key={t.id} t={t} me={me} all={tasks} onCheck={onCheck} onOpen={onOpen} handle={handle(t)} className={dragClass(t)} />)
-        : <div className="empty">Nothing here. Loose to-dos for this section land here, and they also show in this list on the Tasks page.</div>}
+      {shown.length ? shown.map((t) => <TaskRow key={t.id} t={t} me={me} all={tasks} onCheck={onCheck} onOpen={onOpen} handle={handle(t)} className={dragClass(t)} hideProject={hideProject} />)
+        : <div className="empty">{empty}</div>}
       {recent.length > 0 && (
         <>
           <button type="button" className="donehead" aria-expanded={showDone} onClick={() => setShowDone(!showDone)}>
             <span aria-hidden="true">{showDone ? '▾' : '▸'}</span> Completed <span className="sub">{recent.length}</span>
           </button>
-          {showDone && recent.map((t) => <TaskRow key={t.id} t={t} me={me} all={tasks} onCheck={onCheck} onOpen={onOpen} />)}
+          {showDone && recent.map((t) => <TaskRow key={t.id} t={t} me={me} all={tasks} onCheck={onCheck} onOpen={onOpen} hideProject={hideProject} />)}
         </>
       )}
       {overlays}

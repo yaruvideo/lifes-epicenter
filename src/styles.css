@@ -118,3 +118,6 @@ textarea.field { padding: 10px 12px; min-height: 80px; resize: vertical; line-he
 .searchpick-chosen { align-items: center; }
 
 .previewbar { margin: 0 0 16px; padding: 10px 14px; border-radius: var(--r); background: var(--inner); border: 1px dashed var(--accent); font-size: 14px; }
+.projchip { background: var(--inner); color: var(--muted); border: 1px solid var(--border); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stepdate { background: transparent; border: 1px solid transparent; border-radius: var(--r); color: var(--muted); font: inherit; font-size: 12px; padding: 4px 6px; min-height: 32px; max-width: 132px; }
+.stepdate:hover, .stepdate:focus { border-color: var(--border); }

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { newId, patch, remove, save } from '../db.js';
 import { useItems, todayStr } from '../store.js';
-import { PRIORITY_ORDER, listName, useLists, weekEnd, updateSub } from '../tasks.js';
+import { PRIORITY_ORDER, listName, useLists, weekEnd, updateSub, syncStep } from '../tasks.js';
 import { columnFor, columnsOf, useGdProjects } from '../gamedev.js';
+import { LIST_FOR, projectOf, useProjects } from '../projectlinks.js';
 import SubtaskItem from './SubtaskItem.jsx';
 import SearchPick from './SearchPick.jsx';
 import { PEOPLE } from '../config.js';
@@ -14,7 +15,9 @@ export default function TaskModal({ task, me, onClose, onCheck }) {
   const allTasks = useItems('task');
   const lists = useLists();
   const allGd = useGdProjects();
-  const gdProjects = allGd.filter((p) => !p.archived || p.id === t.project);
+  const { open: openProjects, byId: projectById } = useProjects();
+  const pid = projectOf(t);
+  const projectChoices = openProjects.some((p) => p.id === pid) || !projectById[pid] ? openProjects : [...openProjects, projectById[pid]];
   const gdColumns = columnsOf(allGd.find((p) => p.id === (t.project || 'gd-main')));
   const others = allTasks.filter((x) => x.id !== task.id && !x.done);
   const ref = useRef(null);
@@ -25,7 +28,16 @@ export default function TaskModal({ task, me, onClose, onCheck }) {
     return () => window.removeEventListener('keydown', esc);
   }, [onClose]);
 
-  const set = (changes) => { const next = { ...t, ...changes }; setT(next); patch(t.id, changes); };
+  const set = (changes) => {
+    const next = { ...t, ...changes }; setT(next); patch(t.id, changes);
+    // A task made from a video/client step keeps the step's name and date in step with it.
+    if (t.stepRef && ('title' in changes || 'due' in changes)) syncStep(t, { ...('title' in changes && { text: changes.title }), ...('due' in changes && { due: changes.due }) });
+  };
+  // Picking a project files the task in that section's list too, so it shows on the project's page.
+  const pickProject = (id) => {
+    const p = projectById[id];
+    set(p ? { project: id, list: LIST_FOR[p.kind] } : { project: null });
+  };
   const addSub = (e) => {
     e.preventDefault();
     if (!newSub.trim()) return;
@@ -50,13 +62,16 @@ export default function TaskModal({ task, me, onClose, onCheck }) {
               {lists.map(([id, n]) => <option key={id} value={id}>{n}</option>)}
             </select>
           </label>
+          <label className="lbl">Project
+            <select className="field" value={pid || ''} onChange={(e) => pickProject(e.target.value)}>
+              <option value="">None</option>
+              {['Game Dev', 'Video Projects', 'Client Work'].map((g) => projectChoices.some((p) => p.group === g) && (
+                <optgroup key={g} label={g}>{projectChoices.filter((p) => p.group === g).map((p) => <option key={p.id} value={p.id}>{p.name}{p.closed ? ' (finished)' : ''}</option>)}</optgroup>
+              ))}
+            </select>
+          </label>
           {t.list === 'gamedev' && (
             <>
-              <label className="lbl">Game project
-                <select className="field" value={t.project || 'gd-main'} onChange={(e) => set({ project: e.target.value })}>
-                  {gdProjects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-              </label>
               {/* The board's last column means done, so picking it ticks the task off and leaving it reopens it. */}
               <label className="lbl">Board column
                 <select className="field" value={columnFor(t, gdColumns)} onChange={(e) => {
@@ -120,7 +135,7 @@ export default function TaskModal({ task, me, onClose, onCheck }) {
         </form>
         {t.outcome && <div className="note"><b>Outcome:</b> {t.outcome}</div>}
         <div className="row between">
-          <button type="button" className="btn ghost small" onClick={() => { if (confirm('Delete "' + t.title + '"?')) { remove(t.id); onClose(); } }}>Delete task</button>
+          <button type="button" className="btn ghost small" onClick={() => { if (confirm('Delete "' + t.title + '"?')) { remove(t.id); syncStep(t, { due: null, taskId: null }); onClose(); } }}>Delete task</button>
           <div className="row">
             <button type="button" className="btn ghost" onClick={onClose}>Close</button>
             <button type="button" className="btn" onClick={() => onCheck(t)}>{t.done ? 'Mark not done' : '✓ Complete task'}</button>

@@ -7,6 +7,13 @@ import SectionInbox from './SectionInbox.jsx';
 import useDragSort, { sortKeyOf } from './useDragSort.jsx';
 import { CLIENT_STAGES, fromTemplate, useTemplates } from '../projects.js';
 import { newId } from '../db.js';
+import StepRow from './StepRow.jsx';
+import OrderEditor from './OrderEditor.jsx';
+import useTaskActions from './useTaskActions.jsx';
+import { usePageTabs } from '../projectlinks.js';
+
+const CLIENT_TABS = [['board', 'Board'], ['list', 'List'], ['timeline', 'Timeline'], ['inbox', 'Inbox'], ['todos', 'To-dos'], ['clients', 'Clients']];
+const day = 864e5;
 
 const STAGES = CLIENT_STAGES;
 const INVOICE = ['Draft', 'Sent', 'Paid'];
@@ -21,7 +28,16 @@ export default function Client({ me }) {
   const live = projects.filter((p) => !p.parked);
   const parked = projects.filter((p) => p.parked).sort((a, b) => sortKeyOf(a) - sortKeyOf(b));
   const { handle, dragClass } = useDragSort(parked);
-  const [overview, setOverview] = useState(true);
+  const [tabs, saveTabs] = usePageTabs('client', CLIENT_TABS);
+  const visible = tabs.filter((t) => !t.hidden);
+  const [viewPick, setView] = useState(null);
+  const view = visible.some((t) => t.id === viewPick) ? viewPick : visible[0]?.id;
+  const [editTabs, setEditTabs] = useState(false);
+  const [dragId, setDragId] = useState(null);
+  const [[sk, dir], setSort] = useState(['deadline', 1]);
+  const tasks = useItems('task');
+  const { onOpen, overlays } = useTaskActions(me);
+  const openJob = (id) => { setExpanded(id); setView('board'); };
   const [expanded, setExpanded] = useState(null);
   const [cid, setCid] = useState(null);
   const [newClient, setNewClient] = useState('');
@@ -61,19 +77,24 @@ export default function Client({ me }) {
     <>
       <header><div className="sub row" style={{ gap: 8 }}><span className="dot" style={{ background: '#7FA8F5' }} />Section</div><h1>Client Work</h1></header>
 
-      <section className="card" aria-labelledby="ov-h">
-        <div className="row between">
-          <h2 id="ov-h">All client projects</h2>
-          <button type="button" className="btn ghost small" aria-expanded={overview} onClick={() => setOverview(!overview)}>{overview ? 'Collapse' : 'Expand'}</button>
+      <div className="row" style={{ gap: 8 }}>
+        <div className="seg" role="tablist" aria-label="View">
+          {visible.map((t) => <button key={t.id} type="button" role="tab" aria-selected={view === t.id} aria-pressed={view === t.id} onClick={() => setView(t.id)}>{t.name}{t.id === 'inbox' && parked.length ? ' (' + parked.length + ')' : ''}</button>)}
         </div>
-        {overview && (
+        <button type="button" className="btn ghost small" aria-expanded={editTabs} onClick={() => setEditTabs(!editTabs)}>Edit tabs</button>
+      </div>
+      {editTabs && <OrderEditor title="Tabs for Client Work" hint="Drag the ⋮⋮ handle to change the order, or hide tabs you don't use. The first tab opens by default." items={tabs} hide onChange={saveTabs} onDone={() => setEditTabs(false)} />}
+      {view === 'board' && (
+      <section className="card" aria-labelledby="ov-h">
+        <h2 id="ov-h">All client projects</h2>
+        {(
           <div style={{ overflowX: 'auto' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(170px, 1fr))', gap: 10, minWidth: 900 }}>
               {STAGES.map((s, si) => (
-                <div key={s} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div key={s} style={{ display: 'flex', flexDirection: 'column', gap: 8, minHeight: 200 }} onDragOver={(e) => e.preventDefault()} onDrop={() => { if (dragId) patch(dragId, { stage: s }); setDragId(null); }}>
                   <div className="sub" style={{ fontWeight: 600 }}>{s} · {live.filter((p) => p.stage === s).length}</div>
                   {live.filter((p) => p.stage === s).map((p) => (
-                    <div key={p.id} className="note" style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div key={p.id} className="note" draggable onDragStart={() => setDragId(p.id)} style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 6, cursor: 'grab' }}>
                       <button type="button" onClick={() => setExpanded(expanded === p.id ? null : p.id)} aria-expanded={expanded === p.id} style={{ textAlign: 'left', background: 'none', border: 0, padding: 0, cursor: 'pointer' }}>
                         <b>{p.title}</b><span className="sub" style={{ display: 'block', fontSize: 12 }}>{nameOf(p.clientId)}{p.deadline ? ' · due ' + p.deadline : ''}</span>
                       </button>
@@ -85,12 +106,9 @@ export default function Client({ me }) {
                             const setList = (l) => patch(p.id, { checklist: { ...(p.checklist || {}), [p.stage]: l } });
                             return (
                               <>
-                                {list.map((c) => (
-                                  <div key={c.id} className="row" style={{ gap: 6, flexWrap: 'nowrap', fontSize: 13 }}>
-                                    <button type="button" className={'check' + (c.done ? ' done' : '')} style={{ width: 22, height: 22, flex: '0 0 22px' }} aria-label={(c.done ? 'Uncheck ' : 'Check ') + c.text} onClick={() => setList(list.map((x) => (x.id === c.id ? { ...x, done: !x.done } : x)))}>{c.done ? '✓' : ''}</button>
-                                    <span style={{ flex: 1, textDecoration: c.done ? 'line-through' : 'none', color: c.done ? 'var(--muted)' : undefined }}>{c.text}</span>
-                                    <button type="button" className="btn ghost small" style={{ minHeight: 26, padding: '0 6px' }} aria-label={'Remove ' + c.text} onClick={() => setList(list.filter((x) => x.id !== c.id))}>✕</button>
-                                  </div>
+                                {list.map((c) => <StepRow key={c.id} parent={p} item={c} me={me} compact onRemove={() => setList(list.filter((x) => x.id !== c.id))} />)}
+                                {tasks.filter((t) => t.project === p.id && !t.stepRef && !t.done).map((t) => (
+                                  <button key={t.id} type="button" className="linkish" style={{ fontSize: 13, color: 'inherit' }} onClick={() => onOpen(t)}>☐ {t.title}{t.due ? ' · due ' + t.due : ''}</button>
                                 ))}
                                 <form onSubmit={(e) => { e.preventDefault(); if (checkText.trim()) { setList([...list, { id: newId(), text: checkText.trim(), done: false }]); setCheckText(''); } }}>
                                   <input className="field" style={{ minHeight: 36 }} value={checkText} onChange={(e) => setCheckText(e.target.value)} placeholder={'Add to ' + p.stage + ' checklist'} aria-label={'Checklist item for ' + p.title} />
@@ -118,10 +136,58 @@ export default function Client({ me }) {
           </div>
         )}
       </section>
-
+      )}
+      {view === 'list' && (
+        <section className="card" style={{ overflowX: 'auto' }}>
+          <table className="tbl" style={{ minWidth: 560 }}>
+            <thead><tr>{[['title', 'Project'], ['client', 'Client'], ['stage', 'Stage'], ['deadline', 'Deadline'], ['progress', 'Checklist']].map(([k, l]) => (
+              <th key={k} style={{ textAlign: 'left' }} aria-sort={sk === k ? (dir > 0 ? 'ascending' : 'descending') : 'none'}>
+                <button type="button" onClick={() => setSort(sk === k ? [k, -dir] : [k, 1])}>{l}{sk === k ? (dir > 0 ? ' ▲' : ' ▼') : ''}</button>
+              </th>
+            ))}</tr></thead>
+            <tbody>{(() => {
+              const prog = (p) => { const a = Object.values(p.checklist || {}).flat(); return a.length ? a.filter((c) => c.done).length / a.length : 0; };
+              const val = { title: (p) => p.title.toLowerCase(), client: (p) => nameOf(p.clientId).toLowerCase(), stage: (p) => STAGES.indexOf(p.stage), deadline: (p) => p.deadline || '9999', progress: prog };
+              return [...live].sort((a, b) => { const x = val[sk](a), y = val[sk](b); return (x < y ? -1 : x > y ? 1 : 0) * dir; }).map((p) => (
+                <tr key={p.id}>
+                  <td><button type="button" className="linkish" style={{ fontWeight: 600, color: 'inherit' }} onClick={() => openJob(p.id)}>{p.title}</button></td>
+                  <td style={{ textAlign: 'left' }}>{nameOf(p.clientId)}</td>
+                  <td style={{ textAlign: 'left' }}>{p.stage}</td>
+                  <td style={{ textAlign: 'left' }}>{p.deadline || ''}</td>
+                  <td style={{ textAlign: 'left' }}>{Math.round(prog(p) * 100)}%</td>
+                </tr>
+              ));
+            })()}</tbody>
+          </table>
+          {!live.length && <div className="empty">No client projects yet. Add one under Clients.</div>}
+        </section>
+      )}
+      {view === 'timeline' && (() => {
+        const now = new Date(); now.setHours(0, 0, 0, 0);
+        const w0 = new Date(now - now.getDay() * day);
+        const weeks = [...Array(6)].map((_, i) => new Date(+w0 + i * 7 * day));
+        const col = (d) => Math.floor((new Date(d + 'T00:00') - w0) / (7 * day));
+        const dated = live.filter((p) => p.deadline && col(p.deadline) >= 0 && col(p.deadline) < 6).sort((a, b) => a.deadline.localeCompare(b.deadline));
+        const grid = { display: 'grid', gridTemplateColumns: '220px repeat(6, minmax(0, 1fr))', alignItems: 'center', minHeight: 40 };
+        return (
+          <section className="card" style={{ overflowX: 'auto' }}>
+            <div style={{ minWidth: 820, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ ...grid, minHeight: 0, fontSize: 12, fontWeight: 600, color: 'var(--muted)' }}><span />{weeks.map((w) => <span key={+w}>{w.toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>)}</div>
+              {!dated.length && <div className="empty">Give a project a deadline to see it here.</div>}
+              {dated.map((p) => (
+                <div key={p.id} style={grid}>
+                  <button type="button" className="linkish" style={{ fontWeight: 500, paddingRight: 12, color: 'inherit' }} onClick={() => openJob(p.id)}>{p.title} <span className="sub">· {nameOf(p.clientId)}</span></button>
+                  <span style={{ gridColumn: (col(p.deadline) + 2) + ' / span 1', height: 28, borderRadius: 8, background: '#7FA8F5', color: '#131019', fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', padding: '0 10px', marginRight: 4 }}>{p.stage} · {p.deadline.slice(5)}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        );
+      })()}
+      {view === 'inbox' && (
       <section className="card" aria-labelledby="cinbox-h">
         <h2 id="cinbox-h">Inbox <span className="sub" style={{ fontSize: 14, fontWeight: 400 }}>on hold · {parked.length}</span></h2>
-        {parked.length === 0 && <div className="empty">Client projects you put on hold land here. Open a project card above and choose "Move to Inbox".</div>}
+        {parked.length === 0 && <div className="empty">Client projects you put on hold land here. Open a project card on the Board and choose "Move to Inbox".</div>}
         {parked.map((p) => (
           <div key={p.id} data-drag-id={p.id} className={'task' + dragClass(p)}>
             {handle(p)}
@@ -130,9 +196,11 @@ export default function Client({ me }) {
           </div>
         ))}
       </section>
+      )}
+      {view === 'todos' && <SectionInbox me={me} listId="client" title="Loose to-dos" match={(t) => !t.project} />}
 
-      <SectionInbox me={me} listId="client" />
-
+      {view === 'clients' && (
+        <>
       <div className="row between">
         <h2>Per client</h2>
         <form className="row" onSubmit={(e) => { e.preventDefault(); if (newClient.trim()) { save('client', { name: newClient.trim(), rate: 0, notes: '' }).then((c) => setCid(c.id)); setNewClient(''); } }}>
@@ -192,6 +260,9 @@ export default function Client({ me }) {
           </div>
         </>
       )}
+        </>
+      )}
+      {overlays}
     </>
   );
 }

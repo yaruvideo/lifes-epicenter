@@ -1,4 +1,4 @@
-import { newId, patch, save } from './db.js';
+import { db, newId, patch, save } from './db.js';
 import { todayStr, useItems } from './store.js';
 
 export const LISTS = [['inbox', 'Inbox'], ['health', 'Health'], ['client', 'Client Work'], ['video', 'Video Projects'], ['gamedev', 'Game Dev'], ['home', 'Home']];
@@ -43,18 +43,33 @@ function nextDue(due, repeat) {
   return next <= todayStr() ? nextDue(next, repeat) : next;
 }
 
+// Changes one checklist step (by id, whichever stage it's in) inside a video or client project.
+export async function updateStepItem(parentId, itemId, changes) {
+  const row = await db.items.get(parentId);
+  if (!row || row.deleted) return;
+  const cl = row.data.checklist || {};
+  const next = Object.fromEntries(Object.entries(cl).map(([k, list]) => [k, (list || []).map((x) => (x.id === itemId ? { ...x, ...changes } : x))]));
+  await patch(parentId, { checklist: next });
+}
+// A task made from a project step (stepRef) passes its changes back to that step.
+export const syncStep = (t, changes) => t.stepRef && updateStepItem(t.stepRef.id, t.stepRef.item, changes);
+
 export async function completeTask(t, me, outcome = '') {
   await patch(t.id, { done: true, doneAt: Date.now(), doneBy: me, outcome: outcome.trim() });
+  await syncStep(t, { done: true });
   await save('journal', { type: 'task', text: outcome.trim(), title: t.title, list: t.list, taskId: t.id, by: me, at: Date.now() });
   if (t.repeat) {
-    const { id, done, doneAt, doneBy, outcome: _o, ...rest } = t;
+    const { id, done, doneAt, doneBy, outcome: _o, stepRef: _s, ...rest } = t;
     const due = nextDue(t.due, t.repeat);
     // The next round stays out of sight until its day (showFrom), so a finished repeat doesn't reappear right away.
     await save('task', { ...rest, due, showFrom: due, subtasks: cloneSubs(t.subtasks, true), created: Date.now() });
   }
 }
 
-export const undoTask = (t) => patch(t.id, { done: false, doneAt: null, doneBy: null });
+export async function undoTask(t) {
+  await patch(t.id, { done: false, doneAt: null, doneBy: null });
+  await syncStep(t, { done: false });
+}
 
 // A task waiting on another unfinished task stays off Today until that one is done.
 export const isBlocked = (t, all) => !!t.waitingOn && all.some((x) => x.id === t.waitingOn && !x.done);

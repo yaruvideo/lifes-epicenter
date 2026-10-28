@@ -1,7 +1,10 @@
 import { ownerLabel, ownerStyle, todayStr } from '../store.js';
 import { PRIORITY, isBlocked } from '../tasks.js';
+import { projectOf, useProjects } from '../projectlinks.js';
 
-export default function TaskRow({ t, me, all = [], onCheck, onOpen, handle, className = '' }) {
+export default function TaskRow({ t, me, all = [], onCheck, onOpen, handle, className = '', hideProject = false }) {
+  const { byId } = useProjects();
+  const project = !hideProject && byId[projectOf(t)];
   const blocker = isBlocked(t, all) && all.find((x) => x.id === t.waitingOn);
   const subs = t.subtasks || [];
   const overdue = t.due && !t.done && t.due < todayStr();
@@ -15,6 +18,7 @@ export default function TaskRow({ t, me, all = [], onCheck, onOpen, handle, clas
           {[blocker && '🔒 Waiting on: ' + blocker.title, t.due && (overdue ? 'Overdue · ' : 'Due ') + t.due, t.repeat && '↻ ' + t.repeat, t.remindAt && '🔔 ' + t.remindAt.replace('T', ' '), subs.length && subs.filter((s) => s.done).length + '/' + subs.length + ' sub-tasks'].filter(Boolean).join(' · ')}
         </span>
       </button>
+      {project && <span className="chip projchip" title={project.group}>{project.name}</span>}
       {t.priority && <span className="chip" style={PRIORITY[t.priority]}>{t.priority}</span>}
       <span className="chip" style={ownerStyle(t.owner)}>{ownerLabel(t.owner, me)}</span>
     </div>
