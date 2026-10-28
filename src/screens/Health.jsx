@@ -38,6 +38,14 @@ export default function Health({ me }) {
   useEffect(() => { const t = setTimeout(() => seedMedsIfEmpty(meds), 1500); return () => clearTimeout(t); }, [meds.length]);
 
   const today = todayStr();
+  // The day whose meals, water and exercise you're looking at. Meds and weight always stay on today.
+  const [day, setDay] = useState(today);
+  const shiftDay = (n) => { const d = new Date(day + 'T12:00'); d.setDate(d.getDate() + n); const s = d.toISOString().slice(0, 10); if (s <= today) setDay(s); };
+  const isToday = day === today;
+  const dayLabel = (d) => new Date(d + 'T12:00').toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+  const week = [...Array(7)].map((_, i) => { const d = new Date(today + 'T12:00'); d.setDate(d.getDate() - 6 + i); return d.toISOString().slice(0, 10); });
+  const [editId, setEditId] = useState(null);
+  const [draft, setDraft] = useState({});
   const color = PEOPLE[who].color;
   const myMeds = meds.filter((m) => m.person === who && m.active !== false).sort((a, b) => (a.time || '').localeCompare(b.time || '') || (a.order || 0) - (b.order || 0));
   const logOf = (m) => logs.find((l) => l.id === medLogId(m.id, today));
@@ -56,7 +64,7 @@ export default function Health({ me }) {
     save('weight', { person: who, date: today, lb, at: Date.now() }, 'weight-' + who + '-' + today);
     setWIn('');
   };
-  const todaysMeals = meals.filter((m) => m.person === who && m.date === today).sort((a, b) => a.at - b.at);
+  const todaysMeals = meals.filter((m) => m.person === who && m.date === day).sort((a, b) => a.at - b.at);
   const tot = totals(todaysMeals);
   const [sortBy, setSortBy] = useState([null, 0]);
   // Numbers sort highest first on the first click; names A to Z. Third click goes back to time order.
@@ -65,11 +73,11 @@ export default function Health({ me }) {
     setSortBy(sortBy[0] !== k ? [k, first] : sortBy[1] === first ? [k, -first] : [null, 0]);
   };
   const sortedMeals = !sortBy[0] ? todaysMeals : [...todaysMeals].sort((a, b) => sortBy[1] * (sortBy[0] === 'name' ? a.name.localeCompare(b.name) : (a[sortBy[0]] || 0) - (b[sortBy[0]] || 0)));
-  const water = waters.find((w) => w.id === 'water-' + who + '-' + today)?.count || 0;
-  const todaysEx = exercise.filter((e) => e.person === who && e.date === today);
+  const water = waters.find((w) => w.id === 'water-' + who + '-' + day)?.count || 0;
+  const todaysEx = exercise.filter((e) => e.person === who && e.date === day);
 
   const setGoal = (k, v) => save('goals', { ...stored, [k]: num(v) }, 'goals-' + who);
-  const setWater = (n) => save('water', { person: who, date: today, count: Math.max(0, n) }, 'water-' + who + '-' + today);
+  const setWater = (n) => save('water', { person: who, date: day, count: Math.max(0, n) }, 'water-' + who + '-' + day);
   const mq = meal.name.trim().toLowerCase();
   const matches = mq && !pick ? recipes.filter((r) => (r.name || '').toLowerCase().includes(mq)).sort((a, b) => (a.name.toLowerCase().startsWith(mq) ? 0 : 1) - (b.name.toLowerCase().startsWith(mq) ? 0 : 1) || a.name.localeCompare(b.name)).slice(0, 6) : [];
   const showMenu = menu && matches.length > 0;
@@ -87,7 +95,7 @@ export default function Health({ me }) {
     e.preventDefault();
     if (!meal.name.trim()) return;
     const m = { name: meal.name.trim(), calories: num(meal.calories), protein: num(meal.protein), carbs: num(meal.carbs), fat: num(meal.fat) };
-    save('meal', { person: who, date: today, at: Date.now(), ...m, ...(pick ? { recipe: pick.id, servings: num(servings) } : {}) });
+    save('meal', { person: who, date: day, at: Date.now(), ...m, ...(pick ? { recipe: pick.id, servings: num(servings) } : {}) });
     if (!pick && keep) save('recipe', { ...m, servings: 1, ingredients: '', steps: '', tags: '', link: '', by: me, added: Date.now() });
     setMeal({ name: '', calories: '', protein: '', carbs: '', fat: '' });
     setPick(null); setServings('1'); setKeep(false);
@@ -95,7 +103,7 @@ export default function Health({ me }) {
   const addEx = (e) => {
     e.preventDefault();
     if (!ex.what.trim()) return;
-    save('exercise', { person: who, date: today, at: Date.now(), what: ex.what.trim(), minutes: num(ex.minutes) });
+    save('exercise', { person: who, date: day, at: Date.now(), what: ex.what.trim(), minutes: num(ex.minutes) });
     save('journal', { type: 'health', text: ex.what.trim() + (ex.minutes ? ' · ' + ex.minutes + ' min' : ''), by: me, at: Date.now() });
     setEx({ what: '', minutes: '' });
   };
@@ -158,7 +166,28 @@ export default function Health({ me }) {
       </section>
 
       <section className="card" aria-labelledby="mac-h">
-        <div className="row between"><h2 id="mac-h">Macros today</h2>{!stored.auto && <button type="button" className="btn ghost small" onClick={() => setEditGoals(!editGoals)}>{editGoals ? 'Done' : 'Edit goals'}</button>}</div>
+        <div className="row between">
+          <h2 id="mac-h">{isToday ? 'Macros today' : 'Macros · ' + dayLabel(day)}</h2>
+          <div className="row" style={{ gap: 6 }}>
+            <button type="button" className="btn ghost small" aria-label="Previous day" onClick={() => shiftDay(-1)}>‹</button>
+            <input type="date" className="field" style={{ width: 'auto', minHeight: 36 }} max={today} value={day} onChange={(e) => e.target.value && setDay(e.target.value > today ? today : e.target.value)} aria-label="Day to show" />
+            <button type="button" className="btn ghost small" aria-label="Next day" disabled={isToday} onClick={() => shiftDay(1)}>›</button>
+            {!isToday && <button type="button" className="btn small" onClick={() => setDay(today)}>Today</button>}
+            {!stored.auto && <button type="button" className="btn ghost small" onClick={() => setEditGoals(!editGoals)}>{editGoals ? 'Done' : 'Edit goals'}</button>}
+          </div>
+        </div>
+        <div className="row" role="group" aria-label="Last 7 days" style={{ gap: 6 }}>
+          {week.map((d) => {
+            const cal = Math.round(meals.filter((m) => m.person === who && m.date === d).reduce((a, m) => a + (m.calories || 0), 0));
+            return (
+              <button key={d} type="button" className="btn ghost small" aria-pressed={d === day} onClick={() => setDay(d)}
+                style={{ flex: '1 1 80px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 52, gap: 2, borderColor: d === day ? 'var(--accent)' : undefined }}>
+                <span style={{ fontSize: 12 }}>{d === today ? 'Today' : new Date(d + 'T12:00').toLocaleDateString([], { weekday: 'short', day: 'numeric' })}</span>
+                <span className="sub" style={{ fontSize: 12 }}>{cal ? cal + ' cal' : '—'}</span>
+              </button>
+            );
+          })}
+        </div>
         <div className="sub" style={{ fontSize: 13 }}>{stored.auto ? (preview ? 'Targets worked out from body stats and latest weight (' + lastW.lb + ' lb).' : 'Add body stats and a weight below to work out targets.') : 'Using goals you typed in. Turn on "Work out my targets" below to use the formula.'}</div>
         <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
           {MACROS.map(([k, label, unit]) => (
@@ -171,7 +200,9 @@ export default function Health({ me }) {
       </section>
 
       <section className="card" aria-labelledby="meal-h">
-        <h2 id="meal-h">Meals</h2>
+        <h2 id="meal-h">{isToday ? 'Meals' : 'Meals · ' + dayLabel(day)}</h2>
+        {!isToday && <div className="note" style={{ fontSize: 14 }}>You're looking at {dayLabel(day)}. Meals, water and exercise you add or change here go on that day.</div>}
+        {todaysMeals.length === 0 && !isToday && <div className="empty">Nothing logged for {dayLabel(day)}. Add what you ate below.</div>}
         {todaysMeals.length > 0 && (
           <div style={{ overflowX: 'auto' }}>
             <table className="tbl">
@@ -181,14 +212,29 @@ export default function Health({ me }) {
                     <button type="button" onClick={() => sortMeals(k)}>{l}{sortBy[0] === k ? (sortBy[1] > 0 ? ' ▲' : ' ▼') : ''}</button>
                   </th>
                 ))}
-                <th><span className="sr-only">Remove</span></th>
+                <th><span className="sr-only">Edit or remove</span></th>
               </tr></thead>
               <tbody>
-                {sortedMeals.map((m) => (
+                {sortedMeals.map((m) => editId === m.id ? (
+                  <tr key={m.id}>
+                    <td>
+                      <input className="field" style={{ minHeight: 36 }} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} aria-label="Food name" />
+                      <input type="date" className="field" style={{ minHeight: 32, marginTop: 4, width: 'auto' }} max={today} value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} aria-label="Day eaten" />
+                    </td>
+                    {MACROS.map(([k, l]) => <td key={k} className="n"><input className="field" type="number" inputMode="decimal" style={{ minHeight: 36, width: 80, textAlign: 'right' }} value={draft[k]} onChange={(e) => setDraft({ ...draft, [k]: e.target.value })} aria-label={l} /></td>)}
+                    <td className="n" style={{ whiteSpace: 'nowrap' }}>
+                      <button type="button" className="btn small" onClick={() => { if (draft.name.trim()) { save('meal', { ...m, name: draft.name.trim(), date: draft.date || m.date, ...Object.fromEntries(MACROS.map(([k]) => [k, num(draft[k])])) }, m.id); } setEditId(null); }}>Save</button>
+                      <button type="button" className="btn ghost small" onClick={() => setEditId(null)}>Cancel</button>
+                    </td>
+                  </tr>
+                ) : (
                   <tr key={m.id}>
                     <td><b>{m.name}</b>{m.servings && m.servings !== 1 ? <span className="sub"> · {m.servings} servings</span> : null}</td>
                     {MACROS.map(([k]) => <td key={k} className="n">{Math.round((m[k] || 0) * 10) / 10}</td>)}
-                    <td className="n"><button type="button" className="btn ghost small" aria-label={'Remove ' + m.name} onClick={() => remove(m.id)}>✕</button></td>
+                    <td className="n" style={{ whiteSpace: 'nowrap' }}>
+                      <button type="button" className="btn ghost small" aria-label={'Edit ' + m.name} title="Edit" onClick={() => { setEditId(m.id); setDraft({ name: m.name, date: m.date, ...Object.fromEntries(MACROS.map(([k]) => [k, String(m[k] ?? '')])) }); }}>✎</button>
+                      <button type="button" className="btn ghost small" aria-label={'Remove ' + m.name} onClick={() => remove(m.id)}>✕</button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -245,7 +291,7 @@ export default function Health({ me }) {
 
       <div className="grid">
         <section className="card" aria-labelledby="water-h">
-          <h2 id="water-h">Water</h2>
+          <h2 id="water-h">Water{isToday ? '' : ' · ' + dayLabel(day)}</h2>
           <div className="row">
             <button type="button" className="btn ghost" aria-label="One less glass" onClick={() => setWater(water - 1)}>−</button>
             <span className="display" style={{ fontSize: 28, minWidth: 90, textAlign: 'center' }}>{water} / {goals.water}</span>
@@ -256,7 +302,7 @@ export default function Health({ me }) {
           {editGoals && <label className="lbl">Daily water goal (glasses)<Live className="field" type="number" value={String(goals.water)} onSave={(v) => setGoal('water', v)} /></label>}
         </section>
         <section className="card" aria-labelledby="ex-h">
-          <h2 id="ex-h">Exercise</h2>
+          <h2 id="ex-h">Exercise{isToday ? '' : ' · ' + dayLabel(day)}</h2>
           {todaysEx.map((e) => (
             <div key={e.id} className="task"><div style={{ flex: 1 }}><b>{e.what}</b>{e.minutes ? <span className="sub"> · {e.minutes} min</span> : null}</div><button type="button" className="btn ghost small" aria-label={'Remove ' + e.what} onClick={() => remove(e.id)}>✕</button></div>
           ))}
