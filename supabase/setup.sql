@@ -86,3 +86,33 @@ create table if not exists push_sent (key text primary key, at timestamptz not n
 alter table push_sent enable row level security;
 -- Every 2 minutes: select cron.schedule('push-reminders', '*/2 * * * *', $$select net.http_post(url := '<project>/functions/v1/push-reminders', headers := '{"Content-Type":"application/json"}'::jsonb, body := '{}'::jsonb)$$);
 -- Claude's morning check-in uses claude_sync_gcal(range_start, range_end, events) and claude_add_note(note, for_person).
+
+-- Helpers for Claude in other projects (applied to the live project 2026-10-28). Owner-only, never callable from the app.
+-- le_list(kind, match) reads, le_save(kind, json) adds or patches, le_remove(id) / le_restore(id) soft-delete and undo.
+create or replace function le_list(item_kind text, match jsonb default '{}'::jsonb)
+returns setof jsonb language sql security definer stable set search_path = public as $$
+  select data from items where kind = item_kind and not deleted and data @> match order by updated_at desc
+$$;
+create or replace function le_save(item_kind text, changes jsonb)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare h uuid := '23ebf8bf-e293-4351-a4db-434401f7b0a5';
+  nid text := coalesce(changes->>'id', gen_random_uuid()::text);
+  ms bigint := (extract(epoch from clock_timestamp()) * 1000)::bigint;
+  merged jsonb;
+begin
+  select coalesce(data, '{}'::jsonb) || changes || jsonb_build_object('id', nid) into merged from items where id = nid;
+  if merged is null then merged := changes || jsonb_build_object('id', nid); end if;
+  insert into items (id, household_id, kind, data, updated_at, deleted)
+  values (nid, h, item_kind, merged, ms, false)
+  on conflict (id) do update set data = excluded.data, updated_at = excluded.updated_at, deleted = false;
+  return merged;
+end $$;
+create or replace function le_remove(item_id text)
+returns boolean language sql security definer set search_path = public as $$
+  update items set deleted = true, updated_at = (extract(epoch from clock_timestamp()) * 1000)::bigint where id = item_id returning true
+$$;
+create or replace function le_restore(item_id text)
+returns boolean language sql security definer set search_path = public as $$
+  update items set deleted = false, updated_at = (extract(epoch from clock_timestamp()) * 1000)::bigint where id = item_id returning true
+$$;
+revoke execute on function le_list(text, jsonb), le_save(text, jsonb), le_remove(text), le_restore(text) from public, anon, authenticated;
