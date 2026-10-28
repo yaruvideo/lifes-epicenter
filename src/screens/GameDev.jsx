@@ -2,9 +2,54 @@ import { useState } from 'react';
 import { patch, remove, save } from '../db.js';
 import { useItems } from '../store.js';
 import Live from './Live.jsx';
+import SectionInbox from './SectionInbox.jsx';
 
 const COLUMNS = [['todo', 'To do'], ['doing', 'Doing'], ['review', 'Review'], ['done', 'Done']];
 const SECTION = 'gamedev';
+// Each game is its own project. Items saved before projects existed have no `project` and belong to the first one (gd-main).
+const DEFAULT_PROJECTS = [{ id: 'gd-main', name: 'Second Sun' }];
+const inProject = (pid) => (x) => (x.project || 'gd-main') === pid;
+
+function ProjectBar({ projects, active, setActive }) {
+  const all = projects;
+  const shown = all.filter((p) => !p.archived);
+  const archived = all.filter((p) => p.archived);
+  const store = (list) => save('gdprojects', { projects: list }, 'gdprojects');
+  const add = () => {
+    const name = (prompt('Name of the new project?') || '').trim();
+    if (!name) return;
+    const id = 'gd-' + name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + Date.now().toString(36);
+    store([...all, { id, name }]); setActive(id);
+  };
+  const cur = all.find((p) => p.id === active);
+  const rename = () => {
+    const name = (prompt('Rename project', cur.name) || '').trim();
+    if (name) store(all.map((p) => (p.id === active ? { ...p, name } : p)));
+  };
+  const archive = () => {
+    if (shown.length < 2) return alert('Keep at least one project open. Add another first.');
+    if (!confirm('Archive "' + cur.name + '"? It is hidden from the switcher but nothing is deleted, and you can bring it back from Archived.')) return;
+    store(all.map((p) => (p.id === active ? { ...p, archived: true } : p)));
+    setActive(shown.find((p) => p.id !== active).id);
+  };
+  const restore = (id) => { if (!id) return; store(all.map((p) => (p.id === id ? { ...p, archived: false } : p))); setActive(id); };
+  return (
+    <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+      <div className="seg" role="group" aria-label="Project">
+        {shown.map((p) => <button key={p.id} type="button" aria-pressed={p.id === active} onClick={() => setActive(p.id)}>{p.name}</button>)}
+      </div>
+      <button type="button" className="btn ghost small" onClick={add}>+ New project</button>
+      {cur && <button type="button" className="btn ghost small" onClick={rename}>Rename</button>}
+      {cur && <button type="button" className="btn ghost small" onClick={archive}>Archive</button>}
+      {archived.length > 0 && (
+        <select className="field" style={{ width: 'auto', minHeight: 36 }} value="" onChange={(e) => restore(e.target.value)} aria-label="Archived projects">
+          <option value="">Archived ({archived.length})</option>
+          {archived.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
+      )}
+    </div>
+  );
+}
 
 function CardModal({ card, onClose }) {
   const [c, setC] = useState(card);
@@ -68,11 +113,18 @@ function Timeline({ cards, onOpen }) {
 }
 
 export default function GameDev({ me }) {
-  const cards = useItems('card').filter((c) => c.section === SECTION);
-  const notes = useItems('secnote').filter((n) => n.section === SECTION).sort((a, b) => b.at - a.at);
-  const docs = useItems('doc').filter((d) => d.section === SECTION);
-  const links = useItems('link').filter((l) => l.section === SECTION);
-  const [view, setView] = useState('board');
+  const projects = useItems('gdprojects').find((x) => x.id === 'gdprojects')?.projects || DEFAULT_PROJECTS;
+  const prefs = useItems('prefs').find((p) => p.id === 'prefs-' + me) || {};
+  const open1 = projects.filter((p) => !p.archived);
+  const pid = (projects.find((p) => p.id === prefs.gdProject) || open1[0] || projects[0]).id;
+  const setPid = (id) => save('prefs', { ...prefs, gdProject: id }, 'prefs-' + me);
+  const mine = inProject(pid);
+  const cards = useItems('card').filter((c) => c.section === SECTION && mine(c));
+  const notes = useItems('secnote').filter((n) => n.section === SECTION && mine(n)).sort((a, b) => b.at - a.at);
+  const docs = useItems('doc').filter((d) => d.section === SECTION && mine(d));
+  const links = useItems('link').filter((l) => l.section === SECTION && mine(l));
+  const pname = projects.find((p) => p.id === pid)?.name || 'Game Dev';
+  const [view, setView] = useState('todos');
   const [adding, setAdding] = useState({});
   const [openId, setOpenId] = useState(null);
   const [dragId, setDragId] = useState(null);
@@ -86,7 +138,7 @@ export default function GameDev({ me }) {
     e.preventDefault();
     const title = (adding[col] || '').trim();
     if (!title) return;
-    save('card', { section: SECTION, column: col, title, notes: '', order: Date.now() });
+    save('card', { section: SECTION, project: pid, column: col, title, notes: '', order: Date.now() });
     setAdding({ ...adding, [col]: '' });
   };
   const move = (c, dir) => {
@@ -97,9 +149,12 @@ export default function GameDev({ me }) {
   return (
     <>
       <header><div className="sub row" style={{ gap: 8 }}><span className="dot" style={{ background: '#FF9F45' }} />Section</div><h1>Game Dev</h1></header>
+      <ProjectBar projects={projects} active={pid} setActive={setPid} />
       <div className="seg" role="tablist" aria-label="View">
-        {[['board', 'Board'], ['list', 'List'], ['notes', 'Notes'], ['timeline', 'Timeline'], ['docs', 'Docs'], ['links', 'Links']].map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={view === k} aria-pressed={view === k} onClick={() => setView(k)}>{l}</button>)}
+        {[['todos', 'To-dos'], ['board', 'Board'], ['list', 'List'], ['notes', 'Notes'], ['timeline', 'Timeline'], ['docs', 'Docs'], ['links', 'Links']].map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={view === k} aria-pressed={view === k} onClick={() => setView(k)}>{l}</button>)}
       </div>
+
+      {view === 'todos' && <SectionInbox key={pid} me={me} listId="gamedev" title={pname + ' to-dos'} match={mine} extra={{ project: pid }} />}
 
       {view === 'board' && (
         <div style={{ overflowX: 'auto' }}>
@@ -151,7 +206,7 @@ export default function GameDev({ me }) {
 
       {view === 'notes' && (
         <section className="card">
-          <form style={{ display: 'flex', flexDirection: 'column', gap: 8 }} onSubmit={(e) => { e.preventDefault(); if (note.trim()) { save('secnote', { section: SECTION, text: note.trim(), at: Date.now(), by: me }); save('journal', { type: 'thought', text: '[Game Dev] ' + note.trim(), by: me, at: Date.now() }); setNote(''); } }}>
+          <form style={{ display: 'flex', flexDirection: 'column', gap: 8 }} onSubmit={(e) => { e.preventDefault(); if (note.trim()) { save('secnote', { section: SECTION, project: pid, text: note.trim(), at: Date.now(), by: me }); save('journal', { type: 'thought', text: '[' + pname + '] ' + note.trim(), by: me, at: Date.now() }); setNote(''); } }}>
             <textarea className="field" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Devlog: what you worked on, ideas, problems…" aria-label="Dev note" />
             <div><button className="btn" type="submit">Add note</button></div>
           </form>
@@ -167,8 +222,8 @@ export default function GameDev({ me }) {
           <section className="card" style={{ flex: '1 1 220px' }}>
             {docs.map((d) => <button key={d.id} type="button" className={'nav' + (doc?.id === d.id ? ' on' : '')} style={{ border: 0, textAlign: 'left', cursor: 'pointer' }} onClick={() => setDocId(d.id)}>{d.title || 'Untitled'}</button>)}
             <div className="row">
-              {!docs.length && ['Game design doc', 'Art style guide', 'Story & lore', 'Patch notes'].map((t) => <button key={t} type="button" className="btn ghost small" onClick={() => save('doc', { section: SECTION, title: t, body: '', touched: Date.now() })}>+ {t}</button>)}
-              <button type="button" className="btn small" onClick={() => save('doc', { section: SECTION, title: 'New doc', body: '', touched: Date.now() }).then((d) => setDocId(d.id))}>+ New doc</button>
+              {!docs.length && ['Game design doc', 'Art style guide', 'Story & lore', 'Patch notes'].map((t) => <button key={t} type="button" className="btn ghost small" onClick={() => save('doc', { section: SECTION, project: pid, title: t, body: '', touched: Date.now() })}>+ {t}</button>)}
+              <button type="button" className="btn small" onClick={() => save('doc', { section: SECTION, project: pid, title: 'New doc', body: '', touched: Date.now() }).then((d) => setDocId(d.id))}>+ New doc</button>
             </div>
           </section>
           {doc && (
@@ -187,7 +242,7 @@ export default function GameDev({ me }) {
             <div key={l.id} className="task"><a href={l.url} target="_blank" rel="noreferrer" style={{ flex: 1, fontWeight: 600 }}>{l.name}</a><span className="sub" style={{ fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 280, whiteSpace: 'nowrap' }}>{l.url}</span><button type="button" className="btn ghost small" aria-label={'Remove ' + l.name} onClick={() => remove(l.id)}>✕</button></div>
           ))}
           {!links.length && <div className="empty">Link your Google Drive folder, Docs, Sheets, Chat space, code repo, Steamworks page…</div>}
-          <form className="row" onSubmit={(e) => { e.preventDefault(); if (link.name.trim() && link.url.trim()) { save('link', { section: SECTION, name: link.name.trim(), url: /^https?:/.test(link.url) ? link.url.trim() : 'https://' + link.url.trim() }); setLink({ name: '', url: '' }); } }}>
+          <form className="row" onSubmit={(e) => { e.preventDefault(); if (link.name.trim() && link.url.trim()) { save('link', { section: SECTION, project: pid, name: link.name.trim(), url: /^https?:/.test(link.url) ? link.url.trim() : 'https://' + link.url.trim() }); setLink({ name: '', url: '' }); } }}>
             <input className="field" style={{ flex: '1 1 160px' }} value={link.name} onChange={(e) => setLink({ ...link, name: e.target.value })} placeholder="Name (e.g. Google Drive)" aria-label="Link name" />
             <input className="field" style={{ flex: '2 1 240px' }} value={link.url} onChange={(e) => setLink({ ...link, url: e.target.value })} placeholder="https://…" aria-label="Link URL" />
             <button className="btn" type="submit">Add link</button>

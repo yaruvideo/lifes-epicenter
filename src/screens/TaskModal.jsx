@@ -12,6 +12,7 @@ export default function TaskModal({ task, me, onClose, onCheck }) {
   const [newSub, setNewSub] = useState('');
   const allTasks = useItems('task');
   const lists = useLists();
+  const gdProjects = (useItems('gdprojects').find((x) => x.id === 'gdprojects')?.projects || [{ id: 'gd-main', name: 'Second Sun' }]).filter((p) => !p.archived || p.id === t.project);
   const others = allTasks.filter((x) => x.id !== task.id && !x.done);
   const ref = useRef(null);
   useEffect(() => { ref.current?.focus(); }, []);
@@ -46,6 +47,13 @@ export default function TaskModal({ task, me, onClose, onCheck }) {
               {lists.map(([id, n]) => <option key={id} value={id}>{n}</option>)}
             </select>
           </label>
+          {t.list === 'gamedev' && (
+            <label className="lbl">Game project
+              <select className="field" value={t.project || 'gd-main'} onChange={(e) => set({ project: e.target.value })}>
+                {gdProjects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </label>
+          )}
           <label className="lbl">Due
             <input type="date" className="field" value={t.due || ''} onChange={(e) => set({ due: e.target.value || null })} />
           </label>
