@@ -3,11 +3,15 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
 // base './' lets the same build work on GitHub Pages under any repo name.
+// VITE_PREVIEW=1 builds the preview copy served from /preview/: no service worker, so it never
+// takes over the installed app.
+const PREVIEW = process.env.VITE_PREVIEW === '1';
 export default defineConfig({
   base: './',
   plugins: [
     react(),
     VitePWA({
+      disable: PREVIEW,
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg'],
       manifest: {
@@ -27,6 +31,9 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        globIgnores: ['preview/**'],
+        // Leave the preview copy alone: never answer its pages with the live app.
+        navigateFallbackDenylist: [/\/preview\//],
         importScripts: ['push-sw.js'],
         runtimeCaching: [{
           urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/,

@@ -116,3 +116,5 @@ textarea.field { padding: 10px 12px; min-height: 80px; resize: vertical; line-he
 .searchpick-list button { text-align: left; background: none; border: 0; padding: 8px 10px; border-radius: calc(var(--r) - 4px); cursor: pointer; color: var(--text); font: inherit; }
 .searchpick-list button:hover, .searchpick-list button:focus-visible { background: var(--inner); }
 .searchpick-chosen { align-items: center; }
+
+.previewbar { margin: 0 0 16px; padding: 10px 14px; border-radius: var(--r); background: var(--inner); border: 1px dashed var(--accent); font-size: 14px; }

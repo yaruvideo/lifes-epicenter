@@ -1,5 +1,5 @@
 import { save, device } from './db.js';
-import { VAPID_PUBLIC_KEY } from './config.js';
+import { PREVIEW, VAPID_PUBLIC_KEY } from './config.js';
 
 const toBytes = (b64) => {
   const s = atob((b64 + '='.repeat((4 - (b64.length % 4)) % 4)).replace(/-/g, '+').replace(/_/g, '/'));
@@ -9,6 +9,7 @@ const toBytes = (b64) => {
 // Asks permission, subscribes this device, and stores the subscription so the
 // server can send reminders here even when the app is closed.
 export async function enablePush(me) {
+  if (PREVIEW) throw new Error('Turn notifications on from your real app. The preview copy can\'t receive them.');
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) throw new Error('This browser can\'t receive notifications while closed.');
   const perm = await Notification.requestPermission();
   if (perm !== 'granted') throw new Error('Notifications are blocked. Allow them in your browser\'s site settings.');

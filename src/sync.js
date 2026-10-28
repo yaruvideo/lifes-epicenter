@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { PREVIEW } from './config.js';
 import { db, device, onLocalChange } from './db.js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
 
@@ -76,7 +77,8 @@ export async function syncNow() {
     if (!household && !(await loadHousehold())) { setStatus({ state: 'no-household', message: 'Signed in. Create or join your shared space under Settings.' }); return; }
     setStatus({ state: 'syncing', message: 'Syncing…' });
 
-    const dirty = await db.items.where('dirty').equals(1).toArray();
+    // The preview only reads: its changes stay in the preview so the real data is never touched.
+    const dirty = PREVIEW ? [] : await db.items.where('dirty').equals(1).toArray();
     if (dirty.length) {
       const rows = dirty.map((r) => ({ id: r.id, household_id: household, kind: r.kind, data: r.data, updated_at: r.updated_at, deleted: !!r.deleted }));
       const { error } = await c.from('items').upsert(rows);
@@ -109,7 +111,7 @@ export async function syncNow() {
       if (data.length < 500) break;
     }
     window.dispatchEvent(new Event('le-synced'));
-    setStatus({ state: 'ok', message: 'Synced ' + new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + '.' });
+    setStatus({ state: 'ok', message: (PREVIEW ? 'Preview: read your real data at ' : 'Synced ') + new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + '.' });
   } catch (e) {
     setStatus({ state: 'error', message: 'Sync problem: ' + (e.message || e) + '. Your changes are still safe on this device.' });
   } finally {

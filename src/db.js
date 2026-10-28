@@ -1,9 +1,10 @@
 import Dexie from 'dexie';
+import { PREVIEW } from './config.js';
 
 // Everything is stored on the device first (IndexedDB), so the app works offline.
 // Each record is { id, kind, data, updated_at, deleted, dirty }. "dirty" means it
 // changed here and still needs to go up to the cloud.
-export const db = new Dexie('lifes-epicenter');
+export const db = new Dexie(PREVIEW ? 'lifes-epicenter-preview' : 'lifes-epicenter');
 db.version(1).stores({ items: 'id, kind, updated_at, dirty' });
 
 const listeners = new Set();
@@ -37,12 +38,19 @@ export async function all(kind) {
 }
 
 // Device-only preferences (who is using this device, sync keys). Never synced.
+// The preview shares this browser's storage with the live app, so it keeps its own keys
+// (falling back to the live app's, e.g. who is using this device) and never touches the live sync cursor.
+const PREFIX = PREVIEW ? 'le-preview:' : 'le:';
 export const device = {
   get(key, fallback) {
-    try { const v = localStorage.getItem('le:' + key); return v == null ? fallback : JSON.parse(v); } catch { return fallback; }
+    try {
+      let v = localStorage.getItem(PREFIX + key);
+      if (v == null && PREVIEW && key !== 'sync-cursor') v = localStorage.getItem('le:' + key);
+      return v == null ? fallback : JSON.parse(v);
+    } catch { return fallback; }
   },
   set(key, value) {
-    try { localStorage.setItem('le:' + key, JSON.stringify(value)); } catch { /* private mode */ }
+    try { localStorage.setItem(PREFIX + key, JSON.stringify(value)); } catch { /* private mode */ }
   }
 };
 

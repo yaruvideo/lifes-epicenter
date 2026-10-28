@@ -19,12 +19,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
       - run: npm run build
+      # The preview copy: whatever is on the `preview` branch, served at /preview/.
+      # (After pushing `preview`, run this workflow on main to republish: gh workflow run deploy.yml --ref main)
+      - uses: actions/checkout@v4
+        with:
+          ref: preview
+          path: pv
+        continue-on-error: true
+      - name: Build preview
+        if: hashFiles('pv/package.json') != ''
+        working-directory: pv
+        run: npm ci && VITE_PREVIEW=1 npm run build && cp -r dist ../dist/preview
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

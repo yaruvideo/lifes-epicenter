@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { applyLook, DEFAULT_LOOK } from './themes.js';
 import { useItems, useMe } from './store.js';
 import { onStatus, start } from './sync.js';
-import { PEOPLE } from './config.js';
+import { PEOPLE, PREVIEW } from './config.js';
 import Today from './screens/Today.jsx';
 import Tasks from './screens/Tasks.jsx';
 import Journal from './screens/Journal.jsx';
@@ -85,7 +85,7 @@ export default function App() {
           {sync && <div className="syncpill" role="status">{sync.message}</div>}
         </div>
       </nav>
-      <main>{screen}</main>
+      <main>{PREVIEW && <div className="previewbar" role="note"><b>Preview copy.</b> It shows your real data, but changes you make here stay here and won't reach your real app.</div>}{screen}</main>
       <nav className="mobilebar" aria-label="Main">
         {[['today', 'Today'], ['tasks', 'Tasks'], ['health', 'Health'], ['journal', 'Journal'], ['settings', 'More']].map(([id, label]) => (
           <a key={id} href={'#/' + id} className={page === id ? 'on' : ''}>{label}</a>
