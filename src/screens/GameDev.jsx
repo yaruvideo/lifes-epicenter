@@ -4,7 +4,7 @@ import { useItems } from '../store.js';
 import { PEOPLE } from '../config.js';
 import { PRIORITY, addTask, completeTask, isWaiting, priorityRank, undoTask } from '../tasks.js';
 import { columnFor, columnsOf, inProject, saveGdProjects, tabsOf, useGdProjects } from '../gamedev.js';
-import { sortKeyOf } from './useDragSort.jsx';
+import useBoardDrag, { BOARD_SORTS, BoardSortSelect, byAlpha, byMine } from './useBoardDrag.jsx';
 import Live from './Live.jsx';
 import OrderEditor from './OrderEditor.jsx';
 import SectionInbox from './SectionInbox.jsx';
@@ -55,15 +55,26 @@ function ProjectBar({ projects, active, setActive }) {
 
 const meta = (t) => [t.tag, t.due && 'Due ' + t.due, t.owner && t.owner !== 'yaru' && (PEOPLE[t.owner]?.name || 'Together')].filter(Boolean).join(' · ');
 
-function Board({ tasks, columns, me, onOpen, onEditColumns, pid }) {
+export const GD_SORTS = { ...BOARD_SORTS, due: 'Due date (soonest first)', priority: 'Priority (highest first)' };
+const gdSorters = {
+  mine: byMine,
+  alpha: byAlpha,
+  due: (a, b) => (a.due || '9999').localeCompare(b.due || '9999') || byMine(a, b),
+  priority: (a, b) => priorityRank(a.priority) - priorityRank(b.priority) || byMine(a, b)
+};
+
+function Board({ tasks, columns, me, onOpen, onEditColumns, pid, sort, setSort }) {
   const [adding, setAdding] = useState({});
-  const [dragId, setDragId] = useState(null);
   const last = columns[columns.length - 1].id;
+  const mineOrder = sort === 'mine';
   // The last column means finished: moving a card there ticks the task off, moving it back out reopens it.
-  const moveTo = async (t, col) => {
-    if (col === last) { if (!t.done) await completeTask(t, me, ''); }
-    else { if (t.done) await undoTask(t); await patch(t.id, { column: col, sortKey: Date.now() }); }
+  // In My order a drop also sets where the card sits in its column.
+  const moveTo = async (t, col, key) => {
+    const from = columnFor(t, columns);
+    if (col === last) { if (!t.done) await completeTask(t, me, ''); if (key !== undefined) await patch(t.id, { sortKey: key }); }
+    else if (from !== col || key !== undefined) { if (t.done) await undoTask(t); await patch(t.id, { column: col, sortKey: key ?? Date.now() }); }
   };
+  const drag = useBoardDrag(tasks, mineOrder, moveTo);
   const step = (t, dir) => { const i = columns.findIndex((c) => c.id === columnFor(t, columns)) + dir; if (i >= 0 && i < columns.length) moveTo(t, columns[i].id); };
   const add = (col) => (e) => {
     e.preventDefault();
@@ -72,22 +83,26 @@ function Board({ tasks, columns, me, onOpen, onEditColumns, pid }) {
     addTask(title, me, { list: SECTION, project: pid, column: col, sortKey: Date.now() });
     setAdding({ ...adding, [col]: '' });
   };
+  // Outside My order the Done column keeps the most recently finished on top.
+  const order = (c) => (c.id === last && !mineOrder ? (a, b) => (b.doneAt || 0) - (a.doneAt || 0) : gdSorters[sort] || byMine);
   return (
     <>
       <div className="row between">
-        <span className="sub" style={{ fontSize: 13 }}>Same to-dos as the To-dos tab, laid out by stage. Cards in the last column count as done.</span>
-        <button type="button" className="btn ghost small" onClick={onEditColumns}>Edit columns</button>
+        <span className="sub" style={{ fontSize: 13 }}>{mineOrder ? 'Drag cards up and down to order them, or across to change stage.' : 'Drag cards across to change stage. Pick My order to arrange them yourself.'} Cards in the last column count as done.</span>
+        <span className="row" style={{ gap: 8 }}>
+          <BoardSortSelect value={sort} options={GD_SORTS} onChange={setSort} />
+          <button type="button" className="btn ghost small" onClick={onEditColumns}>Edit columns</button>
+        </span>
       </div>
       <div style={{ overflowX: 'auto' }}>
         <div style={{ display: 'grid', gridTemplateColumns: `repeat(${columns.length}, minmax(220px, 1fr))`, gap: 12, minWidth: columns.length * 232 }}>
           {columns.map((c, ci) => {
-            const list = tasks.filter((t) => columnFor(t, columns) === c.id).sort((a, b) => (c.id === last ? (b.doneAt || 0) - (a.doneAt || 0) : sortKeyOf(a) - sortKeyOf(b)));
+            const list = tasks.filter((t) => columnFor(t, columns) === c.id).sort(order(c));
             return (
-              <section key={c.id} className="card" aria-label={c.name} style={{ padding: 12, minHeight: 300 }}
-                onDragOver={(e) => e.preventDefault()} onDrop={() => { const t = tasks.find((x) => x.id === dragId); if (t) moveTo(t, c.id); setDragId(null); }}>
+              <section key={c.id} className="card" aria-label={c.name} style={{ padding: 12, minHeight: 300 }} {...drag.column(c.id, list)}>
                 <div className="row between"><h2 style={{ fontSize: 16 }}>{c.name}</h2><span className="sub">{list.length}</span></div>
                 {list.map((t) => (
-                  <div key={t.id} draggable onDragStart={() => setDragId(t.id)} className="note" style={{ padding: 10, cursor: 'grab', display: 'flex', flexDirection: 'column', gap: 6, opacity: t.done ? 0.75 : 1 }}>
+                  <div key={t.id} {...drag.card(t)} className={'note' + drag.cardClass(t)} style={{ padding: 10, cursor: 'grab', display: 'flex', flexDirection: 'column', gap: 6, opacity: t.done ? 0.75 : 1 }}>
                     <button type="button" onClick={() => onOpen(t)} style={{ textAlign: 'left', background: 'none', border: 0, padding: 0, cursor: 'pointer', fontWeight: 600, color: 'inherit', textDecoration: t.done ? 'line-through' : 'none' }}>{t.milestone ? '◆ ' : ''}{t.title}</button>
                     {t.priority && <span className="pill" style={{ ...PRIORITY[t.priority], alignSelf: 'flex-start', fontSize: 11 }}>{t.priority}</span>}
                     <div className="row between">
@@ -225,6 +240,9 @@ export default function GameDev({ me }) {
     });
   }, [legacy.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const boardSort = GD_SORTS[project.boardSort] ? project.boardSort : 'mine';
+  const setBoardSort = (v) => updateProject({ boardSort: v });
+
   const removeColumn = (c) => {
     const left = columns.filter((x) => x.id !== c.id);
     const open = tasks.filter((t) => !t.done && columnFor(t, columns) === c.id);
@@ -250,11 +268,12 @@ export default function GameDev({ me }) {
       )}
       {editing === 'columns' && (
         <OrderEditor title={'Board columns for ' + project.name} hint="Drag the ⋮⋮ handle to reorder. Rename, add or remove columns too. The last column always means done." items={columns}
-          rename onRemove={removeColumn} addLabel="Add column" onChange={(list) => updateProject({ columns: list })} onDone={() => setEditing(null)} />
+          rename onRemove={removeColumn} addLabel="Add column" onChange={(list) => updateProject({ columns: list })} onDone={() => setEditing(null)}
+          footer={<div className="row" style={{ gap: 8, paddingTop: 4 }}><BoardSortSelect value={boardSort} options={GD_SORTS} onChange={setBoardSort} /></div>} />
       )}
 
       {view === 'todos' && <SectionInbox key={pid} me={me} listId="gamedev" title={project.name + ' to-dos'} match={mine} extra={{ project: pid }} />}
-      {view === 'board' && <Board tasks={tasks} columns={columns} me={me} pid={pid} onOpen={onOpen} onEditColumns={() => setEditing('columns')} />}
+      {view === 'board' && <Board tasks={tasks} columns={columns} me={me} pid={pid} onOpen={onOpen} onEditColumns={() => setEditing('columns')} sort={boardSort} setSort={setBoardSort} />}
       {view === 'list' && <List tasks={tasks} columns={columns} onOpen={onOpen} />}
       {view === 'timeline' && <Timeline tasks={tasks} columns={columns} onOpen={onOpen} />}
 

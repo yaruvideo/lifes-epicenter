@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 // One editor for both board columns and tabs: drag the ⋮⋮ handle to reorder (arrow buttons stay for
 // keyboard and screen readers), and optionally rename, hide, remove and add.
-export default function OrderEditor({ title, hint, items, onChange, rename, hide, onRemove, addLabel, onDone }) {
+export default function OrderEditor({ title, hint, items, onChange, rename, hide, onRemove, addLabel, onDone, footer }) {
   const [name, setName] = useState('');
   const [drag, setDrag] = useState(null);
   const move = (i, dir) => {
@@ -48,6 +48,7 @@ export default function OrderEditor({ title, hint, items, onChange, rename, hide
           <button className="btn small" type="submit">{addLabel}</button>
         </form>
       )}
+      {footer}
     </section>
   );
 }

@@ -6,6 +6,7 @@ import SectionInbox from './SectionInbox.jsx';
 import useDragSort, { sortKeyOf } from './useDragSort.jsx';
 import StepRow from './StepRow.jsx';
 import OrderEditor from './OrderEditor.jsx';
+import useBoardDrag, { BOARD_SORTS, BoardSortSelect, byAlpha, byMine } from './useBoardDrag.jsx';
 import { usePageTabs } from '../projectlinks.js';
 import { DEFAULT_TEMPLATES, VIDEO_STAGES, fromTemplate, saveTemplates, useTemplates } from '../projects.js';
 
@@ -135,37 +136,46 @@ const day = 864e5;
 const shortDate = (d) => new Date(d + 'T12:00').toLocaleDateString([], { month: 'short', day: 'numeric' });
 
 // Kanban: one column per step name (the usual five, plus any custom ones), each video a card. Drag to change step.
-function VideoBoard({ videos, sel, onSelect }) {
-  const [dragId, setDragId] = useState(null);
+const VB_SORTS = { ...BOARD_SORTS, publish: 'Publish date (soonest first)' };
+const vbSorters = { mine: byMine, alpha: byAlpha, publish: (a, b) => (a.publishDate || '9999').localeCompare(b.publishDate || '9999') || byMine(a, b) };
+
+function VideoBoard({ videos, sel, onSelect, sort, setSort }) {
   const cols = [...VIDEO_STAGES, ...new Set(videos.flatMap(stagesOf).filter((s) => !VIDEO_STAGES.includes(s)))];
-  const moveTo = (v, stage) => {
-    if (!stagesOf(v).includes(stage)) return alert('"' + v.title + '" doesn\'t have a "' + stage + '" step. Add it with Edit steps first.');
-    patch(v.id, { stage });
+  const mineOrder = sort === 'mine';
+  const moveTo = (v, stage, key) => {
+    if (v.stage !== stage && !stagesOf(v).includes(stage)) return alert('"' + v.title + '" doesn\'t have a "' + stage + '" step. Add it with Edit steps first.');
+    if (v.stage !== stage || key !== undefined) patch(v.id, key === undefined ? { stage } : { stage, sortKey: key });
   };
+  const drag = useBoardDrag(videos, mineOrder, moveTo);
   return (
-    <div style={{ overflowX: 'auto' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols.length}, minmax(200px, 1fr))`, gap: 12, minWidth: cols.length * 212 }}>
-        {cols.map((c) => {
-          const list = videos.filter((v) => v.stage === c);
-          return (
-            <section key={c} className="card" aria-label={c} style={{ padding: 12, minHeight: 260 }}
-              onDragOver={(e) => e.preventDefault()} onDrop={() => { const v = videos.find((x) => x.id === dragId); if (v) moveTo(v, c); setDragId(null); }}>
-              <div className="row between"><h2 style={{ fontSize: 16 }}>{c}</h2><span className="sub">{list.length}</span></div>
-              {list.map((v) => {
-                const l = Object.values(v.checklist || {}).flat();
-                return (
-                  <button key={v.id} type="button" draggable onDragStart={() => setDragId(v.id)} onClick={() => onSelect(v.id)} className="note"
-                    style={{ padding: 10, cursor: 'grab', textAlign: 'left', color: 'inherit', font: 'inherit', display: 'flex', flexDirection: 'column', gap: 4, outline: sel?.id === v.id ? '2px solid #F2545B' : 'none' }}>
-                    <b>{v.title}</b>
-                    <span className="sub" style={{ fontSize: 12 }}>{[v.series || templateLabel(v), v.publishDate && 'Publish ' + shortDate(v.publishDate), l.length && l.filter((x) => x.done).length + '/' + l.length + ' steps'].filter(Boolean).join(' · ')}</span>
-                  </button>
-                );
-              })}
-            </section>
-          );
-        })}
+    <>
+      <div className="row between">
+        <span className="sub" style={{ fontSize: 13 }}>{mineOrder ? 'Drag cards up and down to order them, or across to change step.' : 'Drag cards across to change step. Pick My order to arrange them yourself.'}</span>
+        <BoardSortSelect value={sort} options={VB_SORTS} onChange={setSort} />
       </div>
-    </div>
+      <div style={{ overflowX: 'auto' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols.length}, minmax(200px, 1fr))`, gap: 12, minWidth: cols.length * 212 }}>
+          {cols.map((c) => {
+            const list = videos.filter((v) => v.stage === c).sort(vbSorters[sort] || byMine);
+            return (
+              <section key={c} className="card" aria-label={c} style={{ padding: 12, minHeight: 260 }} {...drag.column(c, list)}>
+                <div className="row between"><h2 style={{ fontSize: 16 }}>{c}</h2><span className="sub">{list.length}</span></div>
+                {list.map((v) => {
+                  const l = Object.values(v.checklist || {}).flat();
+                  return (
+                    <button key={v.id} type="button" {...drag.card(v)} onClick={() => onSelect(v.id)} className={'note' + drag.cardClass(v)}
+                      style={{ padding: 10, cursor: 'grab', textAlign: 'left', color: 'inherit', font: 'inherit', display: 'flex', flexDirection: 'column', gap: 4, outline: sel?.id === v.id ? '2px solid #F2545B' : 'none' }}>
+                      <b>{v.title}</b>
+                      <span className="sub" style={{ fontSize: 12 }}>{[v.series || templateLabel(v), v.publishDate && 'Publish ' + shortDate(v.publishDate), l.length && l.filter((x) => x.done).length + '/' + l.length + ' steps'].filter(Boolean).join(' · ')}</span>
+                    </button>
+                  );
+                })}
+              </section>
+            );
+          })}
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -251,7 +261,8 @@ export default function Video({ me }) {
   const done = videos.filter((v) => v.done).sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0));
   const sel = videos.find((v) => v.id === selId) || active[0];
   const templates = useTemplates('video');
-  const [tabs, saveTabs] = usePageTabs('video', VIDEO_TABS);
+  const [tabs, saveTabs, pageRec, savePage] = usePageTabs('video', VIDEO_TABS);
+  const boardSort = VB_SORTS[pageRec.boardSort] ? pageRec.boardSort : 'mine';
   const visible = tabs.filter((t) => !t.hidden);
   const [viewPick, setView] = useState(null);
   const view = visible.some((t) => t.id === viewPick) ? viewPick : visible[0]?.id;
@@ -307,7 +318,7 @@ export default function Video({ me }) {
           {showDone && done.map(row)}
         </section>
       )}
-      {view === 'board' && <VideoBoard videos={active} sel={sel} onSelect={setSelId} />}
+      {view === 'board' && <VideoBoard videos={active} sel={sel} onSelect={setSelId} sort={boardSort} setSort={(v) => savePage({ boardSort: v })} />}
       {view === 'list' && <VideoList videos={active} onSelect={setSelId} />}
       {view === 'timeline' && <VideoTimeline videos={active} onSelect={setSelId} />}
       {sel && view !== 'todos' && <Details key={sel.id} v={sel} me={me} />}

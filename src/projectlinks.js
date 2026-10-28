@@ -35,6 +35,8 @@ export function usePageTabs(page, defaults) {
   const ids = [...order.filter((id) => known.includes(id)), ...known.filter((id) => !order.includes(id))];
   const hidden = rec.hiddenTabs || [];
   const tabs = ids.map((id) => ({ id, name: defaults.find((d) => d[0] === id)[1], hidden: hidden.includes(id) }));
-  const saveTabs = (list) => save('pagetabs', { tabs: list.map((t) => t.id), hiddenTabs: list.filter((t) => t.hidden).map((t) => t.id) }, 'pagetabs-' + page);
-  return [tabs, saveTabs];
+  const saveTabs = (list) => save('pagetabs', { ...rec, tabs: list.map((t) => t.id), hiddenTabs: list.filter((t) => t.hidden).map((t) => t.id) }, 'pagetabs-' + page);
+  // Other per-page settings (like the board's sort) ride along on the same record.
+  const savePage = (changes) => save('pagetabs', { ...rec, ...changes }, 'pagetabs-' + page);
+  return [tabs, saveTabs, rec, savePage];
 }

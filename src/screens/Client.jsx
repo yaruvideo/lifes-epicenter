@@ -11,11 +11,14 @@ import StepRow from './StepRow.jsx';
 import OrderEditor from './OrderEditor.jsx';
 import useTaskActions from './useTaskActions.jsx';
 import { usePageTabs } from '../projectlinks.js';
+import useBoardDrag, { BOARD_SORTS, BoardSortSelect, byAlpha, byMine } from './useBoardDrag.jsx';
 
 const CLIENT_TABS = [['board', 'Board'], ['list', 'List'], ['timeline', 'Timeline'], ['inbox', 'Inbox'], ['todos', 'To-dos'], ['clients', 'Clients']];
 const day = 864e5;
 
 const STAGES = CLIENT_STAGES;
+const CB_SORTS = { ...BOARD_SORTS, deadline: 'Deadline (soonest first)' };
+const cbSorters = { mine: byMine, alpha: byAlpha, deadline: (a, b) => (a.deadline || '9999').localeCompare(b.deadline || '9999') || byMine(a, b) };
 const INVOICE = ['Draft', 'Sent', 'Paid'];
 const money = (n) => '$' + (Number(n) || 0).toFixed(2).replace(/\.00$/, '');
 
@@ -28,12 +31,15 @@ export default function Client({ me }) {
   const live = projects.filter((p) => !p.parked);
   const parked = projects.filter((p) => p.parked).sort((a, b) => sortKeyOf(a) - sortKeyOf(b));
   const { handle, dragClass } = useDragSort(parked);
-  const [tabs, saveTabs] = usePageTabs('client', CLIENT_TABS);
+  const [tabs, saveTabs, pageRec, savePage] = usePageTabs('client', CLIENT_TABS);
+  const boardSort = CB_SORTS[pageRec.boardSort] ? pageRec.boardSort : 'mine';
+  const moveJob = (p, stage, key) => { if (p.stage !== stage || key !== undefined) patch(p.id, key === undefined ? { stage } : { stage, sortKey: key }); };
+  const board = useBoardDrag(live, boardSort === 'mine', moveJob);
+  const inStage = (s) => live.filter((p) => p.stage === s).sort(cbSorters[boardSort] || byMine);
   const visible = tabs.filter((t) => !t.hidden);
   const [viewPick, setView] = useState(null);
   const view = visible.some((t) => t.id === viewPick) ? viewPick : visible[0]?.id;
   const [editTabs, setEditTabs] = useState(false);
-  const [dragId, setDragId] = useState(null);
   const [[sk, dir], setSort] = useState(['deadline', 1]);
   const tasks = useItems('task');
   const { onOpen, overlays } = useTaskActions(me);
@@ -86,15 +92,15 @@ export default function Client({ me }) {
       {editTabs && <OrderEditor title="Tabs for Client Work" hint="Drag the ⋮⋮ handle to change the order, or hide tabs you don't use. The first tab opens by default." items={tabs} hide onChange={saveTabs} onDone={() => setEditTabs(false)} />}
       {view === 'board' && (
       <section className="card" aria-labelledby="ov-h">
-        <h2 id="ov-h">All client projects</h2>
+        <div className="row between"><h2 id="ov-h">All client projects</h2><BoardSortSelect value={boardSort} options={CB_SORTS} onChange={(v) => savePage({ boardSort: v })} /></div>
         {(
           <div style={{ overflowX: 'auto' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(170px, 1fr))', gap: 10, minWidth: 900 }}>
               {STAGES.map((s, si) => (
-                <div key={s} style={{ display: 'flex', flexDirection: 'column', gap: 8, minHeight: 200 }} onDragOver={(e) => e.preventDefault()} onDrop={() => { if (dragId) patch(dragId, { stage: s }); setDragId(null); }}>
-                  <div className="sub" style={{ fontWeight: 600 }}>{s} · {live.filter((p) => p.stage === s).length}</div>
-                  {live.filter((p) => p.stage === s).map((p) => (
-                    <div key={p.id} className="note" draggable onDragStart={() => setDragId(p.id)} style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 6, cursor: 'grab' }}>
+                <div key={s} style={{ display: 'flex', flexDirection: 'column', gap: 8, minHeight: 200 }} {...board.column(s, inStage(s))}>
+                  <div className="sub" style={{ fontWeight: 600 }}>{s} · {inStage(s).length}</div>
+                  {inStage(s).map((p) => (
+                    <div key={p.id} {...board.card(p)} className={'note' + board.cardClass(p)} style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 6, cursor: 'grab' }}>
                       <button type="button" onClick={() => setExpanded(expanded === p.id ? null : p.id)} aria-expanded={expanded === p.id} style={{ textAlign: 'left', background: 'none', border: 0, padding: 0, cursor: 'pointer' }}>
                         <b>{p.title}</b><span className="sub" style={{ display: 'block', fontSize: 12 }}>{nameOf(p.clientId)}{p.deadline ? ' · due ' + p.deadline : ''}</span>
                       </button>
