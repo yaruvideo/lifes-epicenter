@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { newId, patch, remove, save } from '../db.js';
 import { useItems, todayStr } from '../store.js';
 import { PRIORITY_ORDER, listName, useLists, weekEnd, updateSub } from '../tasks.js';
+import { columnFor, columnsOf, useGdProjects } from '../gamedev.js';
 import SubtaskItem from './SubtaskItem.jsx';
 import SearchPick from './SearchPick.jsx';
 import { PEOPLE } from '../config.js';
@@ -12,7 +13,9 @@ export default function TaskModal({ task, me, onClose, onCheck }) {
   const [newSub, setNewSub] = useState('');
   const allTasks = useItems('task');
   const lists = useLists();
-  const gdProjects = (useItems('gdprojects').find((x) => x.id === 'gdprojects')?.projects || [{ id: 'gd-main', name: 'Second Sun' }]).filter((p) => !p.archived || p.id === t.project);
+  const allGd = useGdProjects();
+  const gdProjects = allGd.filter((p) => !p.archived || p.id === t.project);
+  const gdColumns = columnsOf(allGd.find((p) => p.id === (t.project || 'gd-main')));
   const others = allTasks.filter((x) => x.id !== task.id && !x.done);
   const ref = useRef(null);
   useEffect(() => { ref.current?.focus(); }, []);
@@ -48,11 +51,32 @@ export default function TaskModal({ task, me, onClose, onCheck }) {
             </select>
           </label>
           {t.list === 'gamedev' && (
-            <label className="lbl">Game project
-              <select className="field" value={t.project || 'gd-main'} onChange={(e) => set({ project: e.target.value })}>
-                {gdProjects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            </label>
+            <>
+              <label className="lbl">Game project
+                <select className="field" value={t.project || 'gd-main'} onChange={(e) => set({ project: e.target.value })}>
+                  {gdProjects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </label>
+              {/* The board's last column means done, so picking it ticks the task off and leaving it reopens it. */}
+              <label className="lbl">Board column
+                <select className="field" value={columnFor(t, gdColumns)} onChange={(e) => {
+                  const col = e.target.value, last = gdColumns[gdColumns.length - 1].id;
+                  if (col === last) { if (!t.done) onCheck(t); return; }
+                  set(t.done ? { column: col, done: false, doneAt: null, doneBy: null } : { column: col });
+                }}>
+                  {gdColumns.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </label>
+              <label className="lbl">Start
+                <input type="date" className="field" value={t.start || ''} onChange={(e) => set({ start: e.target.value || null })} />
+              </label>
+              <label className="lbl">Tag
+                <input className="field" value={t.tag || ''} onChange={(e) => set({ tag: e.target.value })} placeholder="Art, code, audio…" />
+              </label>
+              <label className="lbl">Milestone
+                <span className="row" style={{ gap: 8, minHeight: 44 }}><input type="checkbox" checked={!!t.milestone} onChange={(e) => set({ milestone: e.target.checked })} /> Show as ◆ on the Timeline</span>
+              </label>
+            </>
           )}
           <label className="lbl">Due
             <input type="date" className="field" value={t.due || ''} onChange={(e) => set({ due: e.target.value || null })} />
